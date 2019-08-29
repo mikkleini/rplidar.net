@@ -17,7 +17,7 @@ namespace RPLidar
         /// Command byte
         /// </summary>
         private enum Command : byte
-        {            
+        {
             GetInfo = 0x50,
             GetHealth = 0x52,
             GetConfig = 0x84,
@@ -52,6 +52,7 @@ namespace RPLidar
         // Variables
         private readonly SerialPort port;
         private ScanMode activeMode = ScanMode.None;
+        private List<Measurement> bufferedMeasurements = new List<Measurement>();
 
         /// <summary>
         /// Logging event hanlder
@@ -59,7 +60,7 @@ namespace RPLidar
         /// <param name="sender">Sending object</param>
         /// <param name="e">Arguments</param>
         public delegate void LogEventHandler(object sender, LogEventArgs e);
-        
+
         /// <summary>
         /// Logging event
         /// </summary>
@@ -135,18 +136,15 @@ namespace RPLidar
         {
             get
             {
-                bool result = false;
-
                 try
                 {
-                    result = port.IsOpen;
+                    return port.IsOpen;
                 }
                 catch (Exception ex)
                 {
                     Log("Error at checking port status: " + ex.Message, Severity.Error);
+                    return false;
                 }
-
-                return result;
             }
         }
 
@@ -156,8 +154,6 @@ namespace RPLidar
         /// <returns>true if port was opened, false if it failed</returns>
         public bool Open()
         {
-            bool result = false;
-
             try
             {
                 if (!port.IsOpen)
@@ -165,14 +161,13 @@ namespace RPLidar
                     port.Open();
                 }
 
-                result = port.IsOpen;
+                return port.IsOpen;
             }
             catch (Exception ex)
             {
                 Log("Error at opening port: " + ex.Message, Severity.Error);
+                return false;
             }
-
-            return result;
         }
 
         /// <summary>
@@ -181,23 +176,20 @@ namespace RPLidar
         /// <returns>true if port was closed, false if it failed</returns>
         public bool Close()
         {
-            bool result = false;
-
             try
             {
                 if (port.IsOpen)
                 {
                     port.Close();
                 }
-                
-                result = !port.IsOpen;
+
+                return !port.IsOpen;
             }
             catch (Exception ex)
             {
                 Log("Error at closing port: " + ex.Message, Severity.Error);
+                return false;
             }
-
-            return result;
         }
 
         /// <summary>
@@ -215,6 +207,25 @@ namespace RPLidar
             catch (Exception)
             {
                 // Ignore
+            }
+        }
+
+        /// <summary>
+        /// Number of bytes to read from port
+        /// </summary>
+        private int BytesToRead
+        {
+            get
+            {
+                try
+                {
+                    return port.BytesToRead;
+                }
+                catch (Exception ex)
+                {
+                    Log("Error at checking bytes to read: " + ex.Message, Severity.Error);
+                    return 0;
+                }
             }
         }
 
@@ -392,7 +403,7 @@ namespace RPLidar
         {
             if (!ReadDescriptor(out Descriptor readDescriptor)) return false;
             return CheckDescriptor(readDescriptor, expectedDescriptor);
-        }        
+        }
 
         /// <summary>
         /// Read response
@@ -434,23 +445,24 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Read scan data
+        /// Read scan data bytes
         /// </summary>
-        /// <param name="packetSize">Scan packet size</param>
-        /// <param name="data">Received data</param>
-        /// <returns>true if recetion succeeded (even zero bytes), false if something failed</returns>
-        private bool ReadScanData(int packetSize, out byte[] data)
+        /// <param name="length">Number of bytes to read</param>
+        /// <param name="data">Received data bytes</param>
+        /// <returns>true if recetion succeeded, false if something failed</returns>
+        private bool ReadScanData(int length, out byte[] data)
         {
-            data = new byte[(port.BytesToRead / packetSize) * packetSize];
+            data = new byte[length];
             int dataIndex = 0;
             int bytesRead;
+            long startTime = Timestamp;
 
-            // Get all the bytes which were supposed to be in the buffer
-            while (dataIndex < data.Length)
+            // Get all the bytes which were supposed to be read
+            while (dataIndex < length)
             {
                 try
                 {
-                    bytesRead = port.Read(data, dataIndex, data.Length);
+                    bytesRead = port.Read(data, dataIndex, length - dataIndex);
                 }
                 catch (Exception ex)
                 {
@@ -459,9 +471,33 @@ namespace RPLidar
                 }
 
                 dataIndex += bytesRead;
+
+                // Timeout ?
+                if ((Timestamp - startTime) > ReceiveTimeout)
+                {
+                    Log("Timeout on receiving data", Severity.Error);
+                    return false;
+                }
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Flush input buffer
+        /// </summary>
+        private bool FlushInput()
+        {
+            try
+            {
+                port.DiscardInBuffer();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("Error on discarding input buffer: " + ex.Message, Severity.Error);
+                return false;
+            }
         }
 
         /// <summary>
@@ -470,22 +506,11 @@ namespace RPLidar
         /// <returns>true if success, false if not</returns>
         public bool Reset()
         {
-            if (!SendCommand(Command.Reset)) return false;            
-            Thread.Sleep(5);
+            if (!SendCommand(Command.Reset)) return false;
+            Thread.Sleep(2);
 
+            FlushInput();
             activeMode = ScanMode.None;
-
-            try
-            {
-                port.DiscardInBuffer();
-                Thread.Sleep(5);
-            }
-            catch (Exception ex)
-            {
-                Log("Error on discarding buffers: " + ex.Message, Severity.Error);
-                return false;
-            }
-
             return true;
         }
 
@@ -552,7 +577,7 @@ namespace RPLidar
                 expectedDescriptor.Length = expectedResponseLength.Value + 4;
             }
 
-            if (!SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray())) return false;            
+            if (!SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray())) return false;
             if (!ReadDescriptor(out Descriptor readDescriptor)) return false;
             if (!CheckDescriptor(readDescriptor, expectedDescriptor)) return false;
             if (!ReadResponse(readDescriptor.Length, out byte[] responseRaw)) return false;
@@ -586,7 +611,7 @@ namespace RPLidar
             // Get typical mode
             if (!GetConfigurationType(ConfigType.ScanModeTypical, new byte[0], 2, out response)) return false;
             configuration.Typical = BitConverter.ToUInt16(response, 0);
-            
+
             // Get number of modes
             if (!GetConfigurationType(ConfigType.ScanModeCount, new byte[0], 2, out response)) return false;
             ushort count = BitConverter.ToUInt16(response, 0);
@@ -602,13 +627,13 @@ namespace RPLidar
                 // Get name
                 if (!GetConfigurationType(ConfigType.ScanModeName, modeBytes, null, out response)) return false;
                 modeConfiguration.Name = Encoding.ASCII.GetString(response).TrimEnd('\0');
-                
+
                 // Get microseconds per sample
-                if (!GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4, out response))return false;
+                if (!GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4, out response)) return false;
                 modeConfiguration.UsPerSample = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Get maximum distance
-                if (!GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4, out response))return false;
+                if (!GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4, out response)) return false;
                 modeConfiguration.MaxDistance = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Ge answer type
@@ -655,41 +680,80 @@ namespace RPLidar
         public bool Stop()
         {
             if (!SendCommand(Command.Stop)) return false;
-
             Thread.Sleep(1);
 
+            FlushInput();
             activeMode = ScanMode.None;
             return true;
         }
 
         /// <summary>
+        /// Get scan
+        /// </summary>
+        /// <param name="measurements">Scan measurements</param>
+        /// <returns></returns>
+        /// <remarks>Do not use this function when using GetMeasurements</remarks>
+        public bool GetScan(out List<Measurement> measurements)
+        {
+            int bufferIndex = 0;
+            measurements = new List<Measurement>();
+
+            while (true)
+            {
+                // Try to get measurements
+                if (!GetMeasurements(bufferedMeasurements)) return false;
+
+                // Look for new measurements
+                for (; bufferIndex < bufferedMeasurements.Count; bufferIndex++)
+                {
+                    // If it's new scan marker and there are already some measurement in the list
+                    // then it means this scan cycle has ended
+                    if ((bufferedMeasurements[bufferIndex].IsNewScan) && (measurements.Count != 0))
+                    {
+                        // Remove fetched measurements from buffer
+                        bufferedMeasurements.RemoveRange(0, measurements.Count);
+                        return true;
+                    }
+
+                    // Add to this scan
+                    measurements.Add(bufferedMeasurements[bufferIndex]);
+                }
+            }
+        }
+
+        /// <summary>
         /// Get new measurements
         /// </summary>
-        /// <param name="measurements">Measurements destination list which gets updated</param>
-        /// <param name="count">Number of new measurements added to the list</param>
-        /// <returns>true if measurements received, false if something failed</returns>
-        public bool GetMeasurements(IList<Measurement> measurements, out int count)
+        /// <param name="measurements">List which will be updated</param>
+        /// <returns>true if operation succeeded, false if something failed</returns>
+        /// <remarks>Do not use this function when using GetScan !</remarks>
+        public bool GetMeasurements(IList<Measurement> measurements)
         {
             switch (activeMode)
             {
                 case ScanMode.None:
                     Log("No scan mode active", Severity.Error);
-                    count = 0;
                     return false;
 
                 case ScanMode.Legacy:
-                    if (!GetLegacyMeasurements(measurements, out count)) return false;
+                    if (!GetLegacyMeasurements(measurements)) return false;
                     break;
+
+                case ScanMode.ExpressLegacy:
+                    break;
+
+                case ScanMode.ExpressExtended:
+                    throw new NotSupportedException("Express extended scan not yet supported");
 
                 default:
                     throw new Exception("Invalid scan mode, could be a bug");
             }
 
-            // Check buffer length
-            float usage = 100.0f * ((float)port.BytesToRead / (float)port.ReadBufferSize);
-            if (usage > 50.0f)
+            // Check port buffer utilization and give warning if it's too high
+            int usage = (100 * BytesToRead) / ReadBufferSize;
+            if (usage > 50)
             {
-                Log($"Receive buffer is {usage:f0}% full", Severity.Warning);
+                Log($"Receive buffer is {usage}% full, should read measurements faster", Severity.Warning);
             }
 
             return true;
@@ -699,19 +763,19 @@ namespace RPLidar
         /// Get new legacy measurements
         /// </summary>
         /// <param name="measurements">Measurements destination list which gets updated</param>
-        /// <param name="count">Number of new measurements added to the list</param>
         /// <returns>true if measurements received, false if something failed</returns>
-        private bool GetLegacyMeasurements(IList<Measurement> measurements, out int count)
+        private bool GetLegacyMeasurements(IList<Measurement> measurements)
         {
-            count = 0;
+            // Read up to 20 measurements at once
+            // It would be simpler to code, but less efficient to read packets one by one from serial port
+            int bytesToRead = (Math.Min(100, BytesToRead) / 5) * 5;
+            ReadScanData(bytesToRead, out byte[] buffer);
 
-            if (!ReadScanData(5, out byte[] data)) return false;
-
-            // Parse all packets
-            for (int i = 0; i < data.Length; i += 5)
+            // Parse all packets as 5 byte chunks
+            for (int i = 0; i < buffer.Length; i += 5)
             {
-                bool isNewScan = (data[i] & 1) != 0;
-                bool isNewScan2 = (data[i] & 2) != 0;
+                bool isNewScan  = (buffer[i] & 1) != 0;
+                bool isNewScan2 = (buffer[i] & 2) != 0;
 
                 // Scan flags are inverted ?
                 if (isNewScan == isNewScan2)
@@ -721,20 +785,19 @@ namespace RPLidar
                 }
 
                 // Check bit set ?
-                if ((data[i + 1] & 1) != 1)
+                if ((buffer[i + 1] & 1) != 1)
                 {
                     Log("Receieved invalid scan data (check bit not set)", Severity.Error);
                     return false;
                 }
 
-                // Get angle and distance, ignore quality
-                float angle = ((data[i + 2] << 7) | (data[i + 1] >> 1)) / 64.0f;
-                float dist = 1000.0f * (((data[i + 4] << 8) | data[i + 3]) / 4.0f);
-                int qual = data[i] >> 2;
+                // Get angle, distance and quality
+                float angle    = ((buffer[i + 2] << 7) | (buffer[i + 1] >> 1)) / 64.0f;
+                float distance = (((buffer[i + 4] << 8) | buffer[i + 3]) / 4.0f) * 1000.0f;
+                int quality    = buffer[i] >> 2;
 
-                // Add new measurement
-                measurements.Add(new Measurement(isNewScan, angle, dist, qual));
-                count++;
+                // Add measurement
+                measurements.Add(new Measurement(isNewScan, angle, distance, quality));
             }
 
             return true;
