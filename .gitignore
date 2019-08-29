@@ -1,3 +1,5 @@
 /.vs
-/RPLidar.NET/bin
-/RPLidar.NET/obj
+/RPLidar/bin
+/RPLidar/obj
+/Demo/bin
+/Demo/ojb

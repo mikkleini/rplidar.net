@@ -48,7 +48,6 @@ namespace RPLidar
         private readonly Descriptor HealthDescriptor = new Descriptor(0x03, true, 6);
         private readonly Descriptor LegacyScanDescriptor = new Descriptor(0x05, false, 0x81);
         private readonly Descriptor ExpressScanDescriptor = new Descriptor(84, false, 130);
-        private const double ReceiveTimeout = 0.5;
 
         // Variables
         private readonly SerialPort port;
@@ -69,16 +68,86 @@ namespace RPLidar
         /// <summary>
         /// Constructor
         /// </summary>
+        public Lidar()
+        {
+            port = new SerialPort()
+            {
+                ReadTimeout = 500,
+                ReadBufferSize = 4096,
+                BaudRate = 115200
+            };
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
         /// <param name="portName">Port name</param>
         /// <param name="baudRate">Baud rate</param>
         /// <param name="readBufferSize">Read buffer size in bytes</param>
-        public Lidar(string portName, int baudRate = 115200, int readBufferSize = 4096)
+        public Lidar(string portName = "", int baudRate = 115200, int readBufferSize = 4096)
+            : this()
         {
-            port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
+            PortName = portName;
+            Baudrate = baudRate;
+            ReadBufferSize = readBufferSize;
+        }
+
+        /// <summary>
+        /// Port name
+        /// </summary>
+        public string PortName
+        {
+            get => port.PortName;
+            set => port.PortName = value;
+        }
+
+        /// <summary>
+        /// Baud rate
+        /// </summary>
+        public int Baudrate
+        {
+            get => port.BaudRate;
+            set => port.BaudRate = value;
+        }
+
+        /// <summary>
+        /// Read buffer size
+        /// </summary>
+        public int ReadBufferSize
+        {
+            get => port.ReadBufferSize;
+            set => port.ReadBufferSize = value;
+        }
+
+        /// <summary>
+        /// Receive timeout in milliseconds
+        /// </summary>
+        public int ReceiveTimeout
+        {
+            get => port.ReadTimeout;
+            set => port.ReadTimeout = value;
+        }
+
+        /// <summary>
+        /// Is port open ?
+        /// </summary>
+        public bool IsOpen
+        {
+            get
             {
-                ReadTimeout = (int)(ReceiveTimeout * 1000.0),
-                ReadBufferSize = readBufferSize
-            };
+                bool result = false;
+
+                try
+                {
+                    result = port.IsOpen;
+                }
+                catch (Exception ex)
+                {
+                    Log("Error at checking port status: " + ex.Message, Severity.Error);
+                }
+
+                return result;
+            }
         }
 
         /// <summary>
@@ -91,12 +160,41 @@ namespace RPLidar
 
             try
             {
-                port.Open();
+                if (!port.IsOpen)
+                {
+                    port.Open();
+                }
+
                 result = port.IsOpen;
             }
             catch (Exception ex)
             {
                 Log("Error at opening port: " + ex.Message, Severity.Error);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Try to close lidar port
+        /// </summary>
+        /// <returns>true if port was closed, false if it failed</returns>
+        public bool Close()
+        {
+            bool result = false;
+
+            try
+            {
+                if (port.IsOpen)
+                {
+                    port.Close();
+                }
+                
+                result = !port.IsOpen;
+            }
+            catch (Exception ex)
+            {
+                Log("Error at closing port: " + ex.Message, Severity.Error);
             }
 
             return result;
@@ -131,9 +229,9 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Timestamp in seconds
+        /// Timestamp in milliseconds
         /// </summary>
-        private double Timestamp => (double)Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+        public long Timestamp => Stopwatch.GetTimestamp() / (Stopwatch.Frequency / 1000);
 
         /// <summary>
         /// Control motor
@@ -211,7 +309,7 @@ namespace RPLidar
             byte[] buffer = new byte[64];
             int missingBytes;
             int bytesRead;
-            double startTime = Timestamp;
+            long startTime = Timestamp;
 
             descriptor = null;
 
@@ -306,7 +404,7 @@ namespace RPLidar
         {
             int dataIndex = 0;
             int bytesRead;
-            double startTime = Timestamp;
+            long startTime = Timestamp;
             data = new byte[length];
 
             // Get required number of data bytes
@@ -373,16 +471,14 @@ namespace RPLidar
         public bool Reset()
         {
             if (!SendCommand(Command.Reset)) return false;            
-            Thread.Sleep(10);
+            Thread.Sleep(5);
 
             activeMode = ScanMode.None;
 
             try
             {
-                port.DiscardOutBuffer();
-                Thread.Sleep(10);
                 port.DiscardInBuffer();
-                Thread.Sleep(10);
+                Thread.Sleep(5);
             }
             catch (Exception ex)
             {
