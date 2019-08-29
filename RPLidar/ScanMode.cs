@@ -7,9 +7,8 @@ namespace RPLidar
     /// <summary>
     /// Scan mode
     /// </summary>
-    internal enum ScanMode
+    public enum ScanMode
     {
-        None,
         Legacy,
         ExpressLegacy,
         ExpressExtended

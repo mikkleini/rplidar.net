@@ -11,7 +11,7 @@ namespace RPLidar
     /// <summary>
     /// RPLidar device
     /// </summary>
-    public class Lidar : IDisposable
+    public partial class Lidar : IDisposable
     {
         /// <summary>
         /// Command byte
@@ -44,15 +44,13 @@ namespace RPLidar
         private const byte SyncByte = 0xA5;
         private const byte SyncByte2 = 0x5A;
         private const int DescriptorLength = 7;
-        private readonly Descriptor InfoDescriptor = new Descriptor(0x14, true, 4);
-        private readonly Descriptor HealthDescriptor = new Descriptor(0x03, true, 6);
-        private readonly Descriptor LegacyScanDescriptor = new Descriptor(0x05, false, 0x81);
-        private readonly Descriptor ExpressScanDescriptor = new Descriptor(84, false, 130);
+        private readonly Descriptor InfoDescriptor = new Descriptor(20, true, 0x04);
+        private readonly Descriptor HealthDescriptor = new Descriptor(3, true, 0x06);
+        private readonly Descriptor LegacyScanDescriptor = new Descriptor(5, false, 0x81);
+        private readonly Descriptor ExpressLegacyScanDescriptor = new Descriptor(84, false, 0x82);
 
         // Variables
         private readonly SerialPort port;
-        private ScanMode activeMode = ScanMode.None;
-        private List<Measurement> bufferedMeasurements = new List<Measurement>();
 
         /// <summary>
         /// Logging event hanlder
@@ -74,7 +72,7 @@ namespace RPLidar
             port = new SerialPort()
             {
                 ReadTimeout = 500,
-                ReadBufferSize = 4096,
+                ReadBufferSize = 32768,
                 BaudRate = 115200
             };
         }
@@ -211,7 +209,7 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Number of bytes to read from port
+        /// Number of bytes available for reading from port
         /// </summary>
         private int BytesToRead
         {
@@ -445,49 +443,12 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Read scan data bytes
-        /// </summary>
-        /// <param name="length">Number of bytes to read</param>
-        /// <param name="data">Received data bytes</param>
-        /// <returns>true if recetion succeeded, false if something failed</returns>
-        private bool ReadScanData(int length, out byte[] data)
-        {
-            data = new byte[length];
-            int dataIndex = 0;
-            int bytesRead;
-            long startTime = Timestamp;
-
-            // Get all the bytes which were supposed to be read
-            while (dataIndex < length)
-            {
-                try
-                {
-                    bytesRead = port.Read(data, dataIndex, length - dataIndex);
-                }
-                catch (Exception ex)
-                {
-                    Log("Error at reading scan data: " + ex.Message, Severity.Error);
-                    return false;
-                }
-
-                dataIndex += bytesRead;
-
-                // Timeout ?
-                if ((Timestamp - startTime) > ReceiveTimeout)
-                {
-                    Log("Timeout on receiving data", Severity.Error);
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
         /// Flush input buffer
         /// </summary>
         private bool FlushInput()
         {
+            bufferedMeasurements.Clear();
+
             try
             {
                 port.DiscardInBuffer();
@@ -510,7 +471,7 @@ namespace RPLidar
             Thread.Sleep(2);
 
             FlushInput();
-            activeMode = ScanMode.None;
+            activeMode = null;
             return true;
         }
 
@@ -642,162 +603,6 @@ namespace RPLidar
 
                 // Add to list
                 configuration.Modes.Add(mode, modeConfiguration);
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Start legacy (traditional) scan
-        /// </summary>
-        /// <returns>true if success, false if not</returns>
-        public bool StartLegacyScan()
-        {
-            if (!SendCommand(Command.Scan)) return false;
-            if (!WaitForDescriptor(LegacyScanDescriptor)) return false;
-
-            activeMode = ScanMode.Legacy;
-            return true;
-        }
-
-        /// <summary>
-        /// Start express scan (extended version)
-        /// </summary>
-        /// <returns>true if success, false if not</returns>
-        public bool StartExpressScan()
-        {
-            if (!SendCommand(Command.ExpressScan, new byte[5] { 1, 0, 0, 0, 0 })) return false;
-            if (!WaitForDescriptor(ExpressScanDescriptor)) return false;
-
-            activeMode = ScanMode.ExpressExtended;
-            return true;
-        }
-
-        /// <summary>
-        /// Stop lidar
-        /// </summary>
-        /// <returns>true if success, false if not</returns>
-        public bool Stop()
-        {
-            if (!SendCommand(Command.Stop)) return false;
-            Thread.Sleep(1);
-
-            FlushInput();
-            activeMode = ScanMode.None;
-            return true;
-        }
-
-        /// <summary>
-        /// Get scan
-        /// </summary>
-        /// <param name="measurements">Scan measurements</param>
-        /// <returns></returns>
-        /// <remarks>Do not use this function when using GetMeasurements</remarks>
-        public bool GetScan(out List<Measurement> measurements)
-        {
-            int bufferIndex = 0;
-            measurements = new List<Measurement>();
-
-            while (true)
-            {
-                // Try to get measurements
-                if (!GetMeasurements(bufferedMeasurements)) return false;
-
-                // Look for new measurements
-                for (; bufferIndex < bufferedMeasurements.Count; bufferIndex++)
-                {
-                    // If it's new scan marker and there are already some measurement in the list
-                    // then it means this scan cycle has ended
-                    if ((bufferedMeasurements[bufferIndex].IsNewScan) && (measurements.Count != 0))
-                    {
-                        // Remove fetched measurements from buffer
-                        bufferedMeasurements.RemoveRange(0, measurements.Count);
-                        return true;
-                    }
-
-                    // Add to this scan
-                    measurements.Add(bufferedMeasurements[bufferIndex]);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Get new measurements
-        /// </summary>
-        /// <param name="measurements">List which will be updated</param>
-        /// <returns>true if operation succeeded, false if something failed</returns>
-        /// <remarks>Do not use this function when using GetScan !</remarks>
-        public bool GetMeasurements(IList<Measurement> measurements)
-        {
-            switch (activeMode)
-            {
-                case ScanMode.None:
-                    Log("No scan mode active", Severity.Error);
-                    return false;
-
-                case ScanMode.Legacy:
-                    if (!GetLegacyMeasurements(measurements)) return false;
-                    break;
-
-                case ScanMode.ExpressLegacy:
-                    break;
-
-                case ScanMode.ExpressExtended:
-                    throw new NotSupportedException("Express extended scan not yet supported");
-
-                default:
-                    throw new Exception("Invalid scan mode, could be a bug");
-            }
-
-            // Check port buffer utilization and give warning if it's too high
-            int usage = (100 * BytesToRead) / ReadBufferSize;
-            if (usage > 50)
-            {
-                Log($"Receive buffer is {usage}% full, should read measurements faster", Severity.Warning);
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Get new legacy measurements
-        /// </summary>
-        /// <param name="measurements">Measurements destination list which gets updated</param>
-        /// <returns>true if measurements received, false if something failed</returns>
-        private bool GetLegacyMeasurements(IList<Measurement> measurements)
-        {
-            // Read up to 20 measurements at once
-            // It would be simpler to code, but less efficient to read packets one by one from serial port
-            int bytesToRead = (Math.Min(100, BytesToRead) / 5) * 5;
-            ReadScanData(bytesToRead, out byte[] buffer);
-
-            // Parse all packets as 5 byte chunks
-            for (int i = 0; i < buffer.Length; i += 5)
-            {
-                bool isNewScan  = (buffer[i] & 1) != 0;
-                bool isNewScan2 = (buffer[i] & 2) != 0;
-
-                // Scan flags are inverted ?
-                if (isNewScan == isNewScan2)
-                {
-                    Log("Receieved invalid scan data (start flags not inverted)", Severity.Error);
-                    return false;
-                }
-
-                // Check bit set ?
-                if ((buffer[i + 1] & 1) != 1)
-                {
-                    Log("Receieved invalid scan data (check bit not set)", Severity.Error);
-                    return false;
-                }
-
-                // Get angle, distance and quality
-                float angle    = ((buffer[i + 2] << 7) | (buffer[i + 1] >> 1)) / 64.0f;
-                float distance = (((buffer[i + 4] << 8) | buffer[i + 3]) / 4.0f) * 1000.0f;
-                int quality    = buffer[i] >> 2;
-
-                // Add measurement
-                measurements.Add(new Measurement(isNewScan, angle, distance, quality));
             }
 
             return true;
