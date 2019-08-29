@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace RPLidar.NET
+namespace RPLidar
 {
     /// <summary>
     /// RPLidar device
@@ -74,38 +74,49 @@ namespace RPLidar.NET
         /// <param name="readBufferSize">Read buffer size in bytes</param>
         public Lidar(string portName, int baudRate = 115200, int readBufferSize = 4096)
         {
+            port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
+            {
+                ReadTimeout = (int)(ReceiveTimeout * 1000.0),
+                ReadBufferSize = readBufferSize
+            };
+        }
+
+        /// <summary>
+        /// Try to open lidar port
+        /// </summary>
+        /// <returns>true if port was opened, false if it failed</returns>
+        public bool Open()
+        {
+            bool result = false;
+
             try
             {
-                port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
-                {
-                    ReadTimeout = (int)(ReceiveTimeout * 1000.0),
-                    ReadBufferSize = readBufferSize
-                };
                 port.Open();
+                result = port.IsOpen;
             }
             catch (Exception ex)
             {
                 Log("Error at opening port: " + ex.Message, Severity.Error);
             }
+
+            return result;
         }
 
         /// <summary>
-        /// 
+        /// Disposing of the class instance
         /// </summary>
         public void Dispose()
         {
             try
             {
-                if (port != null)
+                if (port.IsOpen)
                 {
-                    if (port.IsOpen)
-                    {
-                        port.Close();
-                    }
+                    port.Close();
                 }
             }
             catch (Exception)
             {
+                // Ignore
             }
         }
 
@@ -623,9 +634,10 @@ namespace RPLidar.NET
                 // Get angle and distance, ignore quality
                 float angle = ((data[i + 2] << 7) | (data[i + 1] >> 1)) / 64.0f;
                 float dist = 1000.0f * (((data[i + 4] << 8) | data[i + 3]) / 4.0f);
+                int qual = data[i] >> 2;
 
                 // Add new measurement
-                measurements.Add(new Measurement(isNewScan, angle, dist));
+                measurements.Add(new Measurement(isNewScan, angle, dist, qual));
                 count++;
             }
 

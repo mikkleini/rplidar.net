@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace RPLidar.NET
+namespace RPLidar
 {
     /// <summary>
     /// Health status

@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace RPLidar.NET
+namespace RPLidar
 {
+    /// <summary>
+    /// Scan mode
+    /// </summary>
     internal enum ScanMode
     {
         None,

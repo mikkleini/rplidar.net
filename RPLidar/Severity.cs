@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace RPLidar.NET
+namespace RPLidar
 {
     /// <summary>
-    /// Event severity
+    /// Log event severity
     /// </summary>
     public enum Severity
     {
