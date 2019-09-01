@@ -147,6 +147,12 @@ namespace RPLidar
         }
 
         /// <summary>
+        /// Angle offset in degrees
+        /// This value is added to the measurements angle
+        /// </summary>
+        public float AngleOffset { get; set; }
+
+        /// <summary>
         /// Try to open lidar port
         /// </summary>
         /// <returns>true if port was opened, false if it failed</returns>
@@ -243,12 +249,12 @@ namespace RPLidar
         public long Timestamp => Stopwatch.GetTimestamp() / (Stopwatch.Frequency / 1000);
 
         /// <summary>
-        /// Control motor
+        /// Control motor via serial DTR pin
         /// </summary>
         /// <param name="onOff">true to turn on motor, false to turn off</param>
-        public void ControlMotor(bool onOff)
+        public void ControlMotorDtr(bool onOff)
         {
-            port.DtrEnable = onOff;
+            port.DtrEnable = !onOff;
         }
 
         /// <summary>
@@ -471,6 +477,7 @@ namespace RPLidar
             Thread.Sleep(2);
 
             FlushInput();
+            ClearScanBuffer();
             activeMode = null;
             return true;
         }

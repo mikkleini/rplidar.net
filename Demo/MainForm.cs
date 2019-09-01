@@ -35,6 +35,10 @@ namespace Demo
                 comboPort.Items.Add("No port");
             }
 
+            // Fill scan modes list
+            comboMode.Items.AddRange(Enum.GetNames(typeof(ScanMode)));
+            comboMode.SelectedIndex = 0;
+
             // Listen for lidar log events
             lidar.OnLog += Lidar_OnLog;
         }
@@ -56,7 +60,7 @@ namespace Demo
         /// <param name="severity"></param>
         private void WriteLog(string message, Severity severity)
         {
-            textLog.AppendText($"[{severity}] {message}" + Environment.NewLine);
+            textLog.AppendText($"{DateTime.Now.ToLocalTime()} [{severity}] {message}" + Environment.NewLine);
             textLog.ScrollToCaret();
         }
 
@@ -67,18 +71,38 @@ namespace Demo
         /// <param name="e"></param>
         private void ButtonOpen_Click(object sender, EventArgs e)
         {
-            if (comboPort.SelectedIndex >= 0)
+            // Any port selected ?
+            if (comboPort.SelectedIndex < 0) return;
+
+            // Try to open port
+            lidar.PortName = (string)comboPort.SelectedItem;
+            if (!lidar.Open()) return;
+
+            // Check health
+            if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) return;
+            labelHealth.Text = health.ToString();
+
+            // Health not good ?
+            if (health != HealthStatus.Good)
             {
-                lidar.PortName = (string)comboPort.SelectedItem;
-
-                if (lidar.Open())
-                {
-                    buttonOpen.Enabled = false;
-                    buttonClose.Enabled = true;
-
-                    lidar.StartScan(ScanMode.Legacy);
-                }
+                if (!lidar.Reset()) return;
+                WriteLog("Reset done, try open again", Severity.Info);
+                return;
             }
+
+            // Start motor and scan
+            lidar.ControlMotorDtr(true);
+            if (!lidar.StartScan(ScanMode.Legacy)) return;
+            
+            // Scan started, now poll for results
+            timerScan.Enabled = true;            
+
+            // Can't re-open, but can close
+            buttonOpen.Enabled = false;
+            buttonClose.Enabled = true;
+
+            // Report
+            WriteLog("Scanning started", Severity.Info);
         }
 
         /// <summary>
@@ -88,10 +112,39 @@ namespace Demo
         /// <param name="e"></param>
         private void ButtonClose_Click(object sender, EventArgs e)
         {
-            if (lidar.Close())
+            // Stop scanning
+            timerScan.Enabled = false;
+            lidar.ControlMotorDtr(false);
+            lidar.StopScan();
+            lidar.Close();
+
+            // Update status texts
+            labelHealth.Text = "-";
+            labelSPC.Text = "-";
+
+            // Allow opening again
+            buttonOpen.Enabled = true;
+            buttonClose.Enabled = false;
+
+            // Report
+            WriteLog("Scanning stopped", Severity.Info);
+        }
+
+        /// <summary>
+        /// Scan timer tick
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void TimerScan_Tick(object sender, EventArgs e)
+        {
+            if (lidar.GetScan(out Scan scan))
             {
-                buttonOpen.Enabled = true;
-                buttonClose.Enabled = false;
+                if (scan != null)
+                {
+                    WriteLog("Got scan", Severity.Info);
+
+                    labelSPC.Text = (1000.0f / (float)scan.Duration).ToString("f2");
+                }
             }
         }
     }

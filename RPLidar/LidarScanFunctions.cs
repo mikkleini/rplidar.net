@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -14,6 +15,8 @@ namespace RPLidar
         private readonly List<Measurement> bufferedMeasurements = new List<Measurement>();
         private ScanMode? activeMode = null;
         private int lastExpressScanAngle = 0;
+        private int bufferedMeasurementsIndex = 0;
+        private long? lastScanTimestamp = null;
 
         /// <summary>
         /// Start chosen scan mode
@@ -55,42 +58,60 @@ namespace RPLidar
             Thread.Sleep(1);
 
             FlushInput();
+            ClearScanBuffer();
             activeMode = null;
             return true;
         }
 
         /// <summary>
+        /// Clear scan buffer
+        /// </summary>
+        private void ClearScanBuffer()
+        {
+            bufferedMeasurements.Clear();
+            bufferedMeasurementsIndex = 0;
+        }
+
+        /// <summary>
         /// Get scan
         /// </summary>
-        /// <param name="measurements">Scan measurements</param>
-        /// <returns></returns>
+        /// <param name="scan">If scan is ready then returns measurements, otherwise null</param>
+        /// <returns>true of operation succeedef, false if not</returns>
         /// <remarks>Do not use this function when using GetMeasurements</remarks>
-        public bool GetScan(out List<Measurement> measurements)
+        public bool GetScan(out Scan scan)
         {
-            int bufferIndex = 0;
-            measurements = new List<Measurement>();
+            scan = null;
 
-            while (true)
+            // Get all the new measurements
+            if (!GetMeasurements(bufferedMeasurements)) return false;
+
+            // Look for new measurements
+            for (; bufferedMeasurementsIndex < bufferedMeasurements.Count; bufferedMeasurementsIndex++)
             {
-                // Try to get measurements
-                if (!GetMeasurements(bufferedMeasurements)) return false;
-
-                // Look for new measurements
-                for (; bufferIndex < bufferedMeasurements.Count; bufferIndex++)
+                // If it's new and not first measurement then it means the scan has finished
+                if ((bufferedMeasurementsIndex > 0) && (bufferedMeasurements[bufferedMeasurementsIndex].IsNewScan))
                 {
-                    // If it's new scan marker and there are already some measurement in the list
-                    // then it means this scan cycle has ended
-                    if ((bufferedMeasurements[bufferIndex].IsNewScan) && (measurements.Count != 0))
-                    {
-                        // Remove fetched measurements from buffer
-                        bufferedMeasurements.RemoveRange(0, measurements.Count);
-                        return true;
-                    }
+                    scan = new Scan();
 
-                    // Add to this scan
-                    measurements.Add(bufferedMeasurements[bufferIndex]);
+                    // Calculate scan timestamp
+                    // Well, it's accuracy depends on the scanning rate
+                    long timestampNow = Timestamp;
+                    if (lastScanTimestamp.HasValue)
+                    {
+                        scan.Duration = (int)(timestampNow - lastScanTimestamp);
+                    }
+                    lastScanTimestamp = timestampNow;
+
+                    // Move buffered measurements to scan
+                    scan.Measurements.AddRange(bufferedMeasurements.Take(bufferedMeasurementsIndex));
+                    bufferedMeasurements.RemoveRange(0, bufferedMeasurementsIndex);
+                    bufferedMeasurementsIndex = 0;
+                    return true;
                 }
             }
+
+            // Scan not yet ready
+            return true;
         }
 
         /// <summary>
@@ -98,6 +119,7 @@ namespace RPLidar
         /// </summary>
         /// <param name="measurements">List which will be updated</param>
         /// <returns>true if operation succeeded, false if something failed</returns>
+        /// <remarks>Operation succeeds even if no new measurements are added to the buffer</remarks>
         /// <remarks>Do not use this function when using GetScan !</remarks>
         public bool GetMeasurements(IList<Measurement> measurements)
         {
