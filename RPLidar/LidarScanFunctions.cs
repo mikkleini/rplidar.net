@@ -183,7 +183,7 @@ namespace RPLidar
 
                 // Get angle, distance and quality
                 float angle = ((buffer[i + 2] << 7) | (buffer[i + 1] >> 1)) / 64.0f;
-                float distance = (((buffer[i + 4] << 8) | buffer[i + 3]) / 4.0f) * 1000.0f;
+                float distance = (((buffer[i + 4] << 8) | buffer[i + 3]) / 4.0f) / 1000.0f;
                 int quality = buffer[i] >> 2;
 
                 // Add measurement

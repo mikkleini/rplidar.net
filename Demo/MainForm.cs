@@ -141,10 +141,47 @@ namespace Demo
             {
                 if (scan != null)
                 {
-                    WriteLog("Got scan", Severity.Info);
+                    // Draw scan
+                    Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
+                    DrawScan(bmp, scan);
+                    pictureBox.Image = bmp;
 
+                    // Update SpS
                     labelSPC.Text = (1000.0f / (float)scan.Duration).ToString("f2");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Draw scan
+        /// </summary>
+        /// <param name="img"></param>
+        /// <param name="scan"></param>
+        private void DrawScan(Image img, Scan scan)
+        {
+            Graphics gfx =  Graphics.FromImage(img);
+            Point center = new Point(img.Width / 2, img.Height / 2);
+            float scale = (Math.Min(img.Height, img.Width) / 2) / (float)trackDisplayRange.Value;
+            float pointSize = 2.0f;
+
+            // Clear back and draw grid
+            gfx.FillRectangle(Brushes.Black, 0, 0, img.Width, img.Height);
+            gfx.DrawLine(Pens.DarkGreen, 0, center.Y, img.Width, center.Y);
+            gfx.DrawLine(Pens.DarkGreen, center.X, 0, center.X, img.Height);
+
+            foreach (Measurement measurement in scan.Measurements)
+            {
+                // Skip zero-distance (failed) measurements
+                if (measurement.Distance <= float.Epsilon) continue;
+
+                // Draw measurement point
+                PointF p = new PointF
+                {
+                    X = measurement.Distance * scale * (float)Math.Cos(Math.PI / 180.0f * measurement.Angle) + center.X,
+                    Y = measurement.Distance * scale * (float)Math.Sin(Math.PI / 180.0f * measurement.Angle) + center.Y
+                };
+
+                gfx.DrawEllipse(Pens.White, p.X - pointSize / 2.0f, p.Y - pointSize / 2.0f, pointSize, pointSize);
             }
         }
     }

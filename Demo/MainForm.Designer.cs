@@ -40,14 +40,16 @@
             this.splitter1 = new System.Windows.Forms.Splitter();
             this.pictureBox = new System.Windows.Forms.PictureBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
-            this.timerScan = new System.Windows.Forms.Timer(this.components);
             this.toolStripStatusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
             this.labelHealth = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel2 = new System.Windows.Forms.ToolStripStatusLabel();
             this.labelSPC = new System.Windows.Forms.ToolStripStatusLabel();
+            this.timerScan = new System.Windows.Forms.Timer(this.components);
+            this.trackDisplayRange = new System.Windows.Forms.TrackBar();
             this.toolStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).BeginInit();
             this.statusStrip1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackDisplayRange)).BeginInit();
             this.SuspendLayout();
             // 
             // toolStrip1
@@ -134,10 +136,12 @@
             // 
             // pictureBox
             // 
+            this.pictureBox.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
             this.pictureBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pictureBox.Location = new System.Drawing.Point(0, 27);
             this.pictureBox.Name = "pictureBox";
-            this.pictureBox.Size = new System.Drawing.Size(800, 249);
+            this.pictureBox.Size = new System.Drawing.Size(755, 249);
+            this.pictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
             this.pictureBox.TabIndex = 1;
             this.pictureBox.TabStop = false;
             // 
@@ -153,11 +157,6 @@
             this.statusStrip1.Size = new System.Drawing.Size(800, 22);
             this.statusStrip1.TabIndex = 4;
             this.statusStrip1.Text = "statusStrip1";
-            // 
-            // timerScan
-            // 
-            this.timerScan.Interval = 20;
-            this.timerScan.Tick += new System.EventHandler(this.TimerScan_Tick);
             // 
             // toolStripStatusLabel1
             // 
@@ -183,16 +182,35 @@
             this.labelSPC.Size = new System.Drawing.Size(12, 17);
             this.labelSPC.Text = "-";
             // 
+            // timerScan
+            // 
+            this.timerScan.Interval = 20;
+            this.timerScan.Tick += new System.EventHandler(this.TimerScan_Tick);
+            // 
+            // trackDisplayRange
+            // 
+            this.trackDisplayRange.Dock = System.Windows.Forms.DockStyle.Right;
+            this.trackDisplayRange.Location = new System.Drawing.Point(755, 27);
+            this.trackDisplayRange.Maximum = 50;
+            this.trackDisplayRange.Minimum = 1;
+            this.trackDisplayRange.Name = "trackDisplayRange";
+            this.trackDisplayRange.Orientation = System.Windows.Forms.Orientation.Vertical;
+            this.trackDisplayRange.Size = new System.Drawing.Size(45, 249);
+            this.trackDisplayRange.TabIndex = 5;
+            this.trackDisplayRange.TickStyle = System.Windows.Forms.TickStyle.TopLeft;
+            this.trackDisplayRange.Value = 1;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.pictureBox);
+            this.Controls.Add(this.trackDisplayRange);
             this.Controls.Add(this.splitter1);
             this.Controls.Add(this.textLog);
-            this.Controls.Add(this.toolStrip1);
             this.Controls.Add(this.statusStrip1);
+            this.Controls.Add(this.toolStrip1);
             this.Name = "MainForm";
             this.Text = "RPLidar.NET demo";
             this.toolStrip1.ResumeLayout(false);
@@ -200,6 +218,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).EndInit();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.trackDisplayRange)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -223,6 +242,7 @@
         private System.Windows.Forms.ToolStripStatusLabel labelHealth;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel2;
         private System.Windows.Forms.ToolStripStatusLabel labelSPC;
+        private System.Windows.Forms.TrackBar trackDisplayRange;
     }
 }
 
