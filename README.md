@@ -21,8 +21,8 @@ It supports commands:
  - Stop scan
  - Reset
  
-All functions are blocking, except scan and measurements fetching functions which just get as much data as are in SerialPort buffer.
+All functions are blocking, except scan and measurements fetching functions which just get as much data as are in SerialPort buffer. All functions return boolean where true means success, false means some kind of communication error. The errors, warnings and info are reported through OnLog event. I'm not very fond of throwing exceptions here because in real world serial interface can easily receive noise and therefore it's more like a negative scenario than an exception.
 
-It comes with Demo application which is written for Windows Forms running on .NET Core:
+It comes with Demo application which is written for Windows Forms running on .NET Framework 4.8:
 
 ![Screenshot of demo](Demo/screenshot.png)
