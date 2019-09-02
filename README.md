@@ -9,6 +9,8 @@ Tested with:
 I took Python RPLidar implementation as a reference in some places:
 https://github.com/Roboticia/RPLidar
 
+Otherwise it's based on the [Slamtech Interface Protocol and Application Notes for A series](https://www.slamtec.com/en/Support#rplidar-a-series).
+
 It supports commands:
  - Get info
  - Get health
