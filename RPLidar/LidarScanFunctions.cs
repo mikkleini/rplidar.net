@@ -11,10 +11,14 @@ namespace RPLidar
     /// </summary>
     public partial class Lidar
     {
+        // Constants
+        private const int MeasurementsInExpressLegacyScanPacket = 32;
+
         // Variables
         private readonly List<Measurement> bufferedMeasurements = new List<Measurement>();
+        private readonly List<Measurement> bufferedExpressMeasurements = new List<Measurement>();
         private ScanMode? activeMode = null;
-        private int lastExpressScanAngle = 0;
+        private float? lastExpressScanStartAngle = null;
         private int bufferedMeasurementsIndex = 0;
         private long? lastScanTimestamp = null;
 
@@ -41,7 +45,8 @@ namespace RPLidar
                     return true;
 
                 case ScanMode.ExpressExtended:
-                    throw new NotSupportedException("Express extended scan not yet supported");
+                    Log("Express extended scan not yet supported", Severity.Error);
+                    return false;
 
                 default:
                     throw new Exception("Invalid scan mode, could be a bug");
@@ -69,15 +74,19 @@ namespace RPLidar
         private void ClearScanBuffer()
         {
             bufferedMeasurements.Clear();
+            bufferedExpressMeasurements.Clear();
             bufferedMeasurementsIndex = 0;
+            lastExpressScanStartAngle = null;
         }
 
         /// <summary>
-        /// Get scan
+        /// Get scan data.
+        /// Poll this function until full scan object is returned.
+        /// It can only return one 360 degrees scan at once.
         /// </summary>
-        /// <param name="scan">If scan is ready then returns measurements, otherwise null</param>
-        /// <returns>true of operation succeedef, false if not</returns>
-        /// <remarks>Do not use this function when using GetMeasurements</remarks>
+        /// <param name="scan">If scan is ready then return Scan object, otherwise null</param>
+        /// <returns>true of operation succeeded, false if not</returns>
+        /// <remarks>Do not use this function while using GetMeasurements</remarks>
         public bool GetScan(out Scan scan)
         {
             scan = null;
@@ -115,13 +124,14 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Get new measurements
+        /// Get new measurements.
+        /// This is for quick reception of measurement without waiting for the whole 360 scan.
         /// </summary>
         /// <param name="measurements">List which will be updated</param>
         /// <returns>true if operation succeeded, false if something failed</returns>
-        /// <remarks>Operation succeeds even if no new measurements are added to the buffer</remarks>
-        /// <remarks>Do not use this function when using GetScan !</remarks>
-        public bool GetMeasurements(IList<Measurement> measurements)
+        /// <remarks>Operation cam succeed even if no new measurements are added to the list</remarks>
+        /// <remarks>Do not use this function while using GetScan !</remarks>
+        public bool GetMeasurements(List<Measurement> measurements)
         {
             // Check port buffer utilization and give warning if it's too high
             int usage = (100 * BytesToRead) / ReadBufferSize;
@@ -144,7 +154,8 @@ namespace RPLidar
                     return GetExpressLegacyMeasurements(measurements);
 
                 case ScanMode.ExpressExtended:
-                    throw new NotSupportedException("Express extended scan not yet supported");
+                    Log("Express extended scan not yet supported", Severity.Error);
+                    return false;
 
                 default:
                     throw new Exception("Invalid scan mode, could be a bug");
@@ -156,9 +167,9 @@ namespace RPLidar
         /// </summary>
         /// <param name="measurements">Measurements destination list which gets updated</param>
         /// <returns>true if measurements received, false if something failed</returns>
-        private bool GetLegacyMeasurements(IList<Measurement> measurements)
+        private bool GetLegacyMeasurements(List<Measurement> measurements)
         {
-            // Read all 5 byte packets
+            // Read all fully available 5 byte packets
             if (!ReadResponse((BytesToRead / 5) * 5, out byte[] buffer)) return false;
 
             // Parse all packets as 5 byte chunks
@@ -186,6 +197,9 @@ namespace RPLidar
                 float distance = (((buffer[i + 4] << 8) | buffer[i + 3]) / 4.0f) / 1000.0f;
                 int quality = buffer[i] >> 2;
 
+                // Do user angular offset calculation
+                angle = (angle + AngleOffset) % 360.0f;
+
                 // Add measurement
                 measurements.Add(new Measurement(isNewScan, angle, distance, quality));
             }
@@ -198,13 +212,54 @@ namespace RPLidar
         /// </summary>
         /// <param name="measurements">Measurements destination list which gets updated</param>
         /// <returns>true if measurements received, false if something failed</returns>
-        private bool GetExpressLegacyMeasurements(IList<Measurement> measurements)
+        private bool GetExpressLegacyMeasurements(List<Measurement> measurements)
         {
-            // Read and parse as many packets as are available
+            // Read and parse if at least two scan packets are available because
+            // the next packet start angle is used to calculate absolute angle of previous scan samples
             while (BytesToRead >= ExpressLegacyScanDescriptor.Length)
             {
                 if (!ReadResponse(ExpressLegacyScanDescriptor.Length, out byte[] buffer)) return false;
-                if (!ParseExpressLegacyMeasurementsPacket(buffer, measurements)) return false;
+                if (!ParseExpressLegacyMeasurementsPacket(buffer, bufferedExpressMeasurements, out float startAngle)) return false;
+
+                // Previous start angle available ?
+                if (lastExpressScanStartAngle.HasValue)
+                {
+                    // Get angular difference between this packet start angle and previous packet start angle
+                    // and then calculate the each measurement fraction of that
+                    float diffAngle = (startAngle - lastExpressScanStartAngle.Value + 360.0f) % 360.0f;
+                    float angleFraction = diffAngle / (float)MeasurementsInExpressLegacyScanPacket;
+
+                    // Sanity check
+                    if (bufferedExpressMeasurements.Count != MeasurementsInExpressLegacyScanPacket * 2)
+                    {
+                        throw new Exception("Bug in express scan logic");
+                    }
+
+                    // Calculate real angles of previous packet measurements
+                    // Also add user angular offset
+                    for (int i = 0; i < MeasurementsInExpressLegacyScanPacket; i++)
+                    {
+                        // Calculate absolute angle
+                        float absAngle = lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle + AngleOffset;
+
+                        // Do user angular offset calculation
+                        bufferedExpressMeasurements[i].Angle = (absAngle + AngleOffset) % 360.0f;
+
+                        // Full rotation ?
+                        // TODO Maybe should check it at every measurement ?
+                        if ((i == 0) && (startAngle < lastExpressScanStartAngle.Value))
+                        {
+                            bufferedExpressMeasurements[i].IsNewScan = true;
+                        }
+                    }
+
+                    // Move previous packet measurements to return list
+                    measurements.AddRange(bufferedExpressMeasurements.Take(MeasurementsInExpressLegacyScanPacket));
+                    bufferedExpressMeasurements.RemoveRange(0, MeasurementsInExpressLegacyScanPacket);
+                }
+
+                // Remember this packets angle
+                lastExpressScanStartAngle = startAngle;
             }
 
             return true;
@@ -212,13 +267,16 @@ namespace RPLidar
 
         /// <summary>
         /// Parse express legacy mode scan packet
+        /// Note: it does not return measurements with absolute angle!
         /// </summary>
         /// <param name="buffer">Packet payload</param>
         /// <param name="measurements">Measurements destination list which gets updated</param>
+        /// <param name="startAngle">Start angle of this packet measurements</param>
         /// <returns>true if measurements received, false if something failed</returns>
-        private bool ParseExpressLegacyMeasurementsPacket(byte[] buffer, IList<Measurement> measurements)
+        private bool ParseExpressLegacyMeasurementsPacket(byte[] buffer, List<Measurement> measurements, out float startAngle)
         {
             int i;
+            startAngle = 0.0f;
 
             // Verify sync bits
             if (((buffer[0] >> 4) != 0xA) || ((buffer[1] >> 4) != 0x5))
@@ -241,32 +299,29 @@ namespace RPLidar
             }
 
             // Is it a new scan ?
-            // This is actually not working properly - it's only set once. A bug in RPLidar firmware ?
+            // This is only set on first packet after stable start and
+            // when stable operation is restored after some motor instability
             bool newScan = (buffer[3] >> 7) == 1;
 
             // Parse start angle
-            int startAngleq6 = buffer[2] | ((buffer[3] & 0x7F) << 8);
+            startAngle = (buffer[2] | ((buffer[3] & 0x7F) << 8)) / 64.0f;
 
-            // Parse 16 cabins
+            // Parse 16 cabins (32 measurements)
             for (i = 4; i < buffer.Length; i += 5)
             {
+                // Get distance in meters
                 float dist1 = ((buffer[i + 0] >> 2) | (buffer[i + 1] << 6)) / 1000.0f;
                 float dist2 = ((buffer[i + 2] >> 2) | (buffer[i + 3] << 6)) / 1000.0f;
 
-                // Count absolute angular position in fixed point math to avoid accumulating error which would happen with float
-                int da1q6 = (buffer[i + 4] >> 4) | ((buffer[i + 0] & 0x3) << 4);
-                int da2q6 = (buffer[i + 4] & 0x3) | ((buffer[i + 2] & 0x3) << 4);
+                // Get compensation angles (absolute angles will be calculated later)
+                float da1 = ((buffer[i + 4] & 0xF) | ((buffer[i + 0] & 0x3) << 4)) / 8.0f;
+                float da2 = ((buffer[i + 4] >> 4) | ((buffer[i + 2] & 0x3) << 4)) / 8.0f;
 
-                startAngleq6 += da1q6 * 8;
-                float angle1 = startAngleq6 / 64.0f;
-                startAngleq6 += da2q6 * 8;
-                float angle2 = startAngleq6 / 64.0f;
+                // Store par of measurements
+                measurements.Add(new Measurement(newScan, da1, dist1));
+                measurements.Add(new Measurement(false, da2, dist2));
 
-                // Store measurements
-                measurements.Add(new Measurement(newScan, angle1, dist1));
-                measurements.Add(new Measurement(false, angle2, dist2));
-
-                // Report it only for first measurement
+                // Report new scan only on first measurement
                 newScan = false;
             }
 

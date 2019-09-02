@@ -15,6 +15,7 @@ namespace Demo
     public partial class MainForm : Form
     {
         private readonly Lidar lidar = new Lidar();
+        private float sps = 0.0f; // sps = Scans per second
 
         /// <summary>
         /// Constructor
@@ -60,7 +61,7 @@ namespace Demo
         /// <param name="severity"></param>
         private void WriteLog(string message, Severity severity)
         {
-            textLog.AppendText($"{DateTime.Now.ToLocalTime()} [{severity}] {message}" + Environment.NewLine);
+            textLog.AppendText($"{DateTime.Now.ToString("HH:MM:ss.fff")} [{severity}] {message}" + Environment.NewLine);
             textLog.ScrollToCaret();
         }
 
@@ -81,6 +82,10 @@ namespace Demo
             // Check health
             if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) return;
             labelHealth.Text = health.ToString();
+            if (health != HealthStatus.Good)
+            {
+                WriteLog($"Health {health}, error code {errorCode}", Severity.Warning);
+            }
 
             // Health not good ?
             if (health != HealthStatus.Good)
@@ -90,14 +95,27 @@ namespace Demo
                 return;
             }
 
+            // Get configuration
+            if (!lidar.GetConfiguration(out Configuration config)) return;
+            WriteLog("Configuration:", Severity.Info);
+            foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
+            {
+                WriteLog($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
+                    + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty), Severity.Info);
+            }
+
             // Start motor and scan
             lidar.ControlMotorDtr(true);
-            if (!lidar.StartScan(ScanMode.Legacy)) return;
+            if (!Enum.TryParse<ScanMode>(comboMode.SelectedItem.ToString(), out ScanMode mode)) return;
+            if (!lidar.StartScan(mode)) return;
+            sps = 0.0f;
             
             // Scan started, now poll for results
-            timerScan.Enabled = true;            
+            timerScan.Enabled = true;
 
             // Can't re-open, but can close
+            comboPort.Enabled = false;
+            comboMode.Enabled = false;
             buttonOpen.Enabled = false;
             buttonClose.Enabled = true;
 
@@ -121,8 +139,11 @@ namespace Demo
             // Update status texts
             labelHealth.Text = "-";
             labelSPC.Text = "-";
+            labelPPS.Text = "-";
 
             // Allow opening again
+            comboPort.Enabled = true;
+            comboMode.Enabled = true;
             buttonOpen.Enabled = true;
             buttonClose.Enabled = false;
 
@@ -137,18 +158,35 @@ namespace Demo
         /// <param name="e"></param>
         private void TimerScan_Tick(object sender, EventArgs e)
         {
-            if (lidar.GetScan(out Scan scan))
+            // Do scan
+            if (!lidar.GetScan(out Scan scan))
             {
-                if (scan != null)
-                {
-                    // Draw scan
-                    Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
-                    DrawScan(bmp, scan);
-                    pictureBox.Image = bmp;
+                // Error, should restart
+                return;
+            }
 
-                    // Update SpS
-                    labelSPC.Text = (1000.0f / (float)scan.Duration).ToString("f2");
+            // Got full scan ?
+            if (scan != null)
+            {
+                // Draw scan
+                Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
+                DrawScan(bmp, scan);
+                pictureBox.Image = bmp;
+
+                // Calculate scan per second with low pass filtering
+                float fScan = 1000.0f / Math.Max(1, scan.Duration);
+                if (sps <= float.Epsilon)
+                {
+                    sps = fScan;
                 }
+                else
+                {
+                    sps = (sps + fScan) / 2.0f;
+                }
+
+                // Show SpS
+                labelSPC.Text = sps.ToString("f2");
+                labelPPS.Text = scan.Measurements.Count.ToString();
             }
         }
 
@@ -165,7 +203,7 @@ namespace Demo
             float pointSize = 2.0f;
 
             // Clear back and draw grid
-            gfx.FillRectangle(Brushes.Black, 0, 0, img.Width, img.Height);
+            gfx.FillRectangle(SystemBrushes.Window, 0, 0, img.Width, img.Height);
             gfx.DrawLine(Pens.DarkGreen, 0, center.Y, img.Width, center.Y);
             gfx.DrawLine(Pens.DarkGreen, center.X, 0, center.X, img.Height);
 
@@ -181,7 +219,7 @@ namespace Demo
                     Y = measurement.Distance * scale * (float)Math.Sin(Math.PI / 180.0f * measurement.Angle) + center.Y
                 };
 
-                gfx.DrawEllipse(Pens.White, p.X - pointSize / 2.0f, p.Y - pointSize / 2.0f, pointSize, pointSize);
+                gfx.FillEllipse(Brushes.Black, p.X - pointSize / 2.0f, p.Y - pointSize / 2.0f, pointSize, pointSize);
             }
         }
     }
