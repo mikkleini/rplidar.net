@@ -34,8 +34,8 @@
             this.comboPort = new System.Windows.Forms.ToolStripComboBox();
             this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
             this.comboMode = new System.Windows.Forms.ToolStripComboBox();
-            this.buttonOpen = new System.Windows.Forms.ToolStripButton();
-            this.buttonClose = new System.Windows.Forms.ToolStripButton();
+            this.buttonStart = new System.Windows.Forms.ToolStripButton();
+            this.buttonStop = new System.Windows.Forms.ToolStripButton();
             this.textLog = new System.Windows.Forms.TextBox();
             this.splitter1 = new System.Windows.Forms.Splitter();
             this.pictureBox = new System.Windows.Forms.PictureBox();
@@ -64,8 +64,8 @@
             this.comboPort,
             this.toolStripLabel2,
             this.comboMode,
-            this.buttonOpen,
-            this.buttonClose});
+            this.buttonStart,
+            this.buttonStop});
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Margin = new System.Windows.Forms.Padding(3);
             this.toolStrip1.Name = "toolStrip1";
@@ -98,25 +98,25 @@
             this.comboMode.Name = "comboMode";
             this.comboMode.Size = new System.Drawing.Size(131, 23);
             // 
-            // buttonOpen
+            // buttonStart
             // 
-            this.buttonOpen.Enabled = false;
-            this.buttonOpen.Image = global::Demo.Properties.Resources.PlayHS;
-            this.buttonOpen.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.buttonOpen.Name = "buttonOpen";
-            this.buttonOpen.Size = new System.Drawing.Size(56, 20);
-            this.buttonOpen.Text = "&Open";
-            this.buttonOpen.Click += new System.EventHandler(this.ButtonOpen_Click);
+            this.buttonStart.Enabled = false;
+            this.buttonStart.Image = global::Demo.Properties.Resources.PlayHS;
+            this.buttonStart.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.buttonStart.Name = "buttonStart";
+            this.buttonStart.Size = new System.Drawing.Size(51, 20);
+            this.buttonStart.Text = "&Start";
+            this.buttonStart.Click += new System.EventHandler(this.ButtonStart_Click);
             // 
-            // buttonClose
+            // buttonStop
             // 
-            this.buttonClose.Enabled = false;
-            this.buttonClose.Image = global::Demo.Properties.Resources.StopHS;
-            this.buttonClose.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.buttonClose.Name = "buttonClose";
-            this.buttonClose.Size = new System.Drawing.Size(56, 20);
-            this.buttonClose.Text = "&Close";
-            this.buttonClose.Click += new System.EventHandler(this.ButtonClose_Click);
+            this.buttonStop.Enabled = false;
+            this.buttonStop.Image = global::Demo.Properties.Resources.StopHS;
+            this.buttonStop.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.buttonStop.Name = "buttonStop";
+            this.buttonStop.Size = new System.Drawing.Size(51, 20);
+            this.buttonStop.Text = "Sto&p";
+            this.buttonStop.Click += new System.EventHandler(this.ButtonStop_Click);
             // 
             // textLog
             // 
@@ -291,8 +291,8 @@
 
         private System.Windows.Forms.ToolStrip toolStrip1;
         private System.Windows.Forms.ToolStripLabel toolStripLabel1;
-        private System.Windows.Forms.ToolStripButton buttonOpen;
-        private System.Windows.Forms.ToolStripButton buttonClose;
+        private System.Windows.Forms.ToolStripButton buttonStart;
+        private System.Windows.Forms.ToolStripButton buttonStop;
         private System.Windows.Forms.PictureBox pictureBox;
         private System.Windows.Forms.TextBox textLog;
         private System.Windows.Forms.Splitter splitter1;

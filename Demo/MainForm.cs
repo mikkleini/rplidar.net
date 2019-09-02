@@ -29,7 +29,7 @@ namespace Demo
             if (comboPort.Items.Count > 0)
             {
                 comboPort.SelectedIndex = 0;
-                buttonOpen.Enabled = true;
+                buttonStart.Enabled = true;
             }
             else
             {
@@ -66,21 +66,34 @@ namespace Demo
         }
 
         /// <summary>
-        /// (Re)open lidar port
+        /// Start scan button press
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void ButtonOpen_Click(object sender, EventArgs e)
+        private void ButtonStart_Click(object sender, EventArgs e)
+        {
+            if (!StartScan())
+            {
+                // Close if something failed
+                lidar.Close();
+            }
+        }
+
+        /// <summary>
+        /// Start scanning (at least try)
+        /// </summary>
+        /// <returns></returns>
+        private bool StartScan()
         {
             // Any port selected ?
-            if (comboPort.SelectedIndex < 0) return;
+            if (comboPort.SelectedIndex < 0) return false;
 
             // Try to open port
             lidar.PortName = (string)comboPort.SelectedItem;
-            if (!lidar.Open()) return;
+            if (!lidar.Open()) return false;
 
             // Check health
-            if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) return;
+            if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) return false;
             labelHealth.Text = health.ToString();
             if (health != HealthStatus.Good)
             {
@@ -90,13 +103,13 @@ namespace Demo
             // Health not good ?
             if (health != HealthStatus.Good)
             {
-                if (!lidar.Reset()) return;
+                if (!lidar.Reset()) return false;
                 WriteLog("Reset done, try open again", Severity.Info);
-                return;
+                return false;
             }
 
             // Get configuration
-            if (!lidar.GetConfiguration(out Configuration config)) return;
+            if (!lidar.GetConfiguration(out Configuration config)) return false;
             WriteLog("Configuration:", Severity.Info);
             foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
             {
@@ -106,8 +119,8 @@ namespace Demo
 
             // Start motor and scan
             lidar.ControlMotorDtr(true);
-            if (!Enum.TryParse<ScanMode>(comboMode.SelectedItem.ToString(), out ScanMode mode)) return;
-            if (!lidar.StartScan(mode)) return;
+            if (!Enum.TryParse<ScanMode>(comboMode.SelectedItem.ToString(), out ScanMode mode)) return false;
+            if (!lidar.StartScan(mode)) return false;
             sps = 0.0f;
             
             // Scan started, now poll for results
@@ -116,19 +129,20 @@ namespace Demo
             // Can't re-open, but can close
             comboPort.Enabled = false;
             comboMode.Enabled = false;
-            buttonOpen.Enabled = false;
-            buttonClose.Enabled = true;
+            buttonStart.Enabled = false;
+            buttonStop.Enabled = true;
 
             // Report
             WriteLog("Scanning started", Severity.Info);
+            return true;
         }
 
         /// <summary>
-        /// Close lidar port
+        /// Stop scan button press
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void ButtonClose_Click(object sender, EventArgs e)
+        private void ButtonStop_Click(object sender, EventArgs e)
         {
             // Stop scanning
             timerScan.Enabled = false;
@@ -144,8 +158,8 @@ namespace Demo
             // Allow opening again
             comboPort.Enabled = true;
             comboMode.Enabled = true;
-            buttonOpen.Enabled = true;
-            buttonClose.Enabled = false;
+            buttonStart.Enabled = true;
+            buttonStop.Enabled = false;
 
             // Report
             WriteLog("Scanning stopped", Severity.Info);
@@ -200,26 +214,35 @@ namespace Demo
             Graphics gfx =  Graphics.FromImage(img);
             Point center = new Point(img.Width / 2, img.Height / 2);
             float scale = (Math.Min(img.Height, img.Width) / 2) / (float)trackDisplayRange.Value;
-            float pointSize = 2.0f;
+            int pointSize = 2;
 
             // Clear back and draw grid
             gfx.FillRectangle(SystemBrushes.Window, 0, 0, img.Width, img.Height);
-            gfx.DrawLine(Pens.DarkGreen, 0, center.Y, img.Width, center.Y);
-            gfx.DrawLine(Pens.DarkGreen, center.X, 0, center.X, img.Height);
+            gfx.DrawLine(Pens.LightGreen, 0, center.Y, img.Width, center.Y);
+            gfx.DrawLine(Pens.LightGreen, center.X, 0, center.X, img.Height);
 
+            // Draw ranges
+            int rangeStep = Math.Max(1, ((int)(img.Width / scale) / 10));
+            for (int range = rangeStep; range <= 50; range += rangeStep)
+            {
+                float sr = range * scale;
+                gfx.DrawEllipse(Pens.LightGreen, center.X - sr, center.Y - sr, sr * 2, sr * 2);
+                gfx.DrawString(range.ToString() + "m", SystemFonts.DialogFont, Brushes.LightGreen, center.X + sr + 5, center.Y + 5);
+            }
+
+            // Draw measurement points
             foreach (Measurement measurement in scan.Measurements)
             {
                 // Skip zero-distance (failed) measurements
                 if (measurement.Distance <= float.Epsilon) continue;
 
-                // Draw measurement point
-                PointF p = new PointF
+                Point p = new Point
                 {
-                    X = measurement.Distance * scale * (float)Math.Cos(Math.PI / 180.0f * measurement.Angle) + center.X,
-                    Y = measurement.Distance * scale * (float)Math.Sin(Math.PI / 180.0f * measurement.Angle) + center.Y
+                    X = (int)(measurement.Distance * scale * (float)Math.Cos(Math.PI / 180.0f * measurement.Angle)) + center.X,
+                    Y = (int)(measurement.Distance * scale * (float)Math.Sin(Math.PI / 180.0f * measurement.Angle)) + center.Y
                 };
 
-                gfx.FillEllipse(Brushes.Black, p.X - pointSize / 2.0f, p.Y - pointSize / 2.0f, pointSize, pointSize);
+                gfx.FillEllipse(Brushes.Black, p.X - pointSize / 2, p.Y - pointSize / 2, pointSize, pointSize);
             }
         }
     }
