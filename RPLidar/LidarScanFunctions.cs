@@ -64,7 +64,7 @@ namespace RPLidar
 
             FlushInput();
             ClearScanBuffer();
-            activeMode = null;
+
             return true;
         }
 
@@ -73,6 +73,7 @@ namespace RPLidar
         /// </summary>
         private void ClearScanBuffer()
         {
+            activeMode = null;
             bufferedMeasurements.Clear();
             bufferedExpressMeasurements.Clear();
             bufferedMeasurementsIndex = 0;
@@ -134,7 +135,8 @@ namespace RPLidar
         public bool GetMeasurements(List<Measurement> measurements)
         {
             // Check port buffer utilization and give warning if it's too high
-            int usage = (100 * BytesToRead) / ReadBufferSize;
+            if (!GetBytesToRead(out int bytesToRead)) return false;
+            int usage = (100 * bytesToRead) / ReadBufferSize;
             if (usage > 50)
             {
                 Log($"Receive buffer is {usage}% full, should read measurements faster", Severity.Warning);
@@ -170,7 +172,8 @@ namespace RPLidar
         private bool GetLegacyMeasurements(List<Measurement> measurements)
         {
             // Read all fully available 5 byte packets
-            if (!ReadResponse((BytesToRead / 5) * 5, out byte[] buffer)) return false;
+            if (!GetBytesToRead(out int bytesToRead)) return false;
+            if (!ReadResponse((bytesToRead / 5) * 5, out byte[] buffer)) return false;
 
             // Parse all packets as 5 byte chunks
             for (int i = 0; i < buffer.Length; i += 5)
@@ -216,8 +219,10 @@ namespace RPLidar
         {
             // Read and parse if at least two scan packets are available because
             // the next packet start angle is used to calculate absolute angle of previous scan samples
-            while (BytesToRead >= ExpressLegacyScanDescriptor.Length)
+            while (true)
             {
+                if (!GetBytesToRead(out int bytesToRead)) return false;
+                if (bytesToRead < ExpressLegacyScanDescriptor.Length) return true;
                 if (!ReadResponse(ExpressLegacyScanDescriptor.Length, out byte[] buffer)) return false;
                 if (!ParseExpressLegacyMeasurementsPacket(buffer, bufferedExpressMeasurements, out float startAngle)) return false;
 
@@ -261,8 +266,6 @@ namespace RPLidar
                 // Remember this packets angle
                 lastExpressScanStartAngle = startAngle;
             }
-
-            return true;
         }
 
         /// <summary>

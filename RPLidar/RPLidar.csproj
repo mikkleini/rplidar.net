@@ -6,6 +6,11 @@
     <AssemblyName>RPLidar</AssemblyName>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="4.5.0" />
   </ItemGroup>

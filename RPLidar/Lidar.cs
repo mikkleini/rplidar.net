@@ -215,21 +215,20 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Number of bytes available for reading from port
+        /// Get number of bytes available for reading from port
         /// </summary>
-        private int BytesToRead
+        private bool GetBytesToRead(out int count)
         {
-            get
+            try
             {
-                try
-                {
-                    return port.BytesToRead;
-                }
-                catch (Exception ex)
-                {
-                    Log("Error at checking bytes to read: " + ex.Message, Severity.Error);
-                    return 0;
-                }
+                count = port.BytesToRead;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("Error at checking bytes to read: " + ex.Message, Severity.Error);
+                count = 0;
+                return false;
             }
         }
 
@@ -478,7 +477,7 @@ namespace RPLidar
 
             FlushInput();
             ClearScanBuffer();
-            activeMode = null;
+            
             return true;
         }
 
@@ -613,6 +612,15 @@ namespace RPLidar
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Class to string
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return "Lidar";
         }
     }
 }
