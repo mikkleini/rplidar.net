@@ -201,7 +201,7 @@ namespace RPLidar
                 int quality = buffer[i] >> 2;
 
                 // Do user angular offset calculation
-                angle = (angle + AngleOffset) % 360.0f;
+                angle = ((IsFlipped ? -angle : angle) + AngleOffset) % 360.0f;
 
                 // Add measurement
                 measurements.Add(new Measurement(isNewScan, angle, distance, quality));
@@ -245,10 +245,10 @@ namespace RPLidar
                     for (int i = 0; i < MeasurementsInExpressLegacyScanPacket; i++)
                     {
                         // Calculate absolute angle
-                        float absAngle = lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle + AngleOffset;
+                        float absAngle = lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle;
 
                         // Do user angular offset calculation
-                        bufferedExpressMeasurements[i].Angle = (absAngle + AngleOffset) % 360.0f;
+                        bufferedExpressMeasurements[i].Angle = ((IsFlipped ? -absAngle : absAngle) + AngleOffset) % 360.0f;
 
                         // Full rotation ?
                         // TODO Maybe should check it at every measurement ?

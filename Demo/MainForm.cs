@@ -40,6 +40,10 @@ namespace Demo
             comboMode.Items.AddRange(Enum.GetNames(typeof(ScanMode)));
             comboMode.SelectedIndex = 0;
 
+            // Setup other things
+            comboIsFlipped.SelectedIndex = 0;
+            textAngleOffset.Text = "0";
+
             // Listen for lidar log events
             lidar.OnLog += Lidar_OnLog;
         }
@@ -87,6 +91,20 @@ namespace Demo
         {
             // Any port selected ?
             if (comboPort.SelectedIndex < 0) return false;
+
+            // Flipped ?
+            lidar.IsFlipped = comboIsFlipped.SelectedIndex == 1;
+
+            // Try to parse angle offset
+            if (float.TryParse(textAngleOffset.Text, out float angleOffset))
+            {
+                lidar.AngleOffset = angleOffset;
+            }
+            else
+            {
+                WriteLog("Invalid angle offset, using zero", Severity.Warning);
+                lidar.AngleOffset = 0.0f;
+            }
 
             // Try to open port
             lidar.PortName = (string)comboPort.SelectedItem;

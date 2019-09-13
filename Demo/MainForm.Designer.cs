@@ -50,6 +50,11 @@
             this.panel1 = new System.Windows.Forms.Panel();
             this.trackDisplayRange = new System.Windows.Forms.TrackBar();
             this.label1 = new System.Windows.Forms.Label();
+            this.toolStripLabel3 = new System.Windows.Forms.ToolStripLabel();
+            this.textAngleOffset = new System.Windows.Forms.ToolStripTextBox();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.buttonIsFlipped = new System.Windows.Forms.ToolStripLabel();
+            this.comboIsFlipped = new System.Windows.Forms.ToolStripComboBox();
             this.toolStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).BeginInit();
             this.statusStrip1.SuspendLayout();
@@ -64,6 +69,11 @@
             this.comboPort,
             this.toolStripLabel2,
             this.comboMode,
+            this.buttonIsFlipped,
+            this.comboIsFlipped,
+            this.toolStripLabel3,
+            this.textAngleOffset,
+            this.toolStripSeparator1,
             this.buttonStart,
             this.buttonStop});
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
@@ -84,7 +94,7 @@
             // 
             this.comboPort.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboPort.Name = "comboPort";
-            this.comboPort.Size = new System.Drawing.Size(101, 23);
+            this.comboPort.Size = new System.Drawing.Size(80, 23);
             // 
             // toolStripLabel2
             // 
@@ -260,6 +270,39 @@
             this.label1.TabIndex = 7;
             this.label1.Text = "Range:";
             // 
+            // toolStripLabel3
+            // 
+            this.toolStripLabel3.Name = "toolStripLabel3";
+            this.toolStripLabel3.Size = new System.Drawing.Size(74, 20);
+            this.toolStripLabel3.Text = "Angle offset:";
+            // 
+            // textAngleOffset
+            // 
+            this.textAngleOffset.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.textAngleOffset.Name = "textAngleOffset";
+            this.textAngleOffset.Size = new System.Drawing.Size(50, 23);
+            this.textAngleOffset.Text = "0";
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 23);
+            // 
+            // buttonIsFlipped
+            // 
+            this.buttonIsFlipped.Name = "buttonIsFlipped";
+            this.buttonIsFlipped.Size = new System.Drawing.Size(49, 20);
+            this.buttonIsFlipped.Text = "Flipped:";
+            // 
+            // comboIsFlipped
+            // 
+            this.comboIsFlipped.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboIsFlipped.Items.AddRange(new object[] {
+            "No",
+            "Yes"});
+            this.comboIsFlipped.Name = "comboIsFlipped";
+            this.comboIsFlipped.Size = new System.Drawing.Size(75, 23);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -310,6 +353,11 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel3;
         private System.Windows.Forms.ToolStripStatusLabel labelPPS;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel3;
+        private System.Windows.Forms.ToolStripTextBox textAngleOffset;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.ToolStripLabel buttonIsFlipped;
+        private System.Windows.Forms.ToolStripComboBox comboIsFlipped;
     }
 }
 

@@ -153,6 +153,11 @@ namespace RPLidar
         public float AngleOffset { get; set; }
 
         /// <summary>
+        /// True if lidar is flipped (upside down), false it it's in upright position
+        /// </summary>
+        public bool IsFlipped { get; set; }
+
+        /// <summary>
         /// Try to open lidar port
         /// </summary>
         /// <returns>true if port was opened, false if it failed</returns>
@@ -452,8 +457,6 @@ namespace RPLidar
         /// </summary>
         private bool FlushInput()
         {
-            bufferedMeasurements.Clear();
-
             try
             {
                 port.DiscardInBuffer();
