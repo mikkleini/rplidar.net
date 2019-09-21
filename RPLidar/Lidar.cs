@@ -265,8 +265,9 @@ namespace RPLidar
         /// Send command
         /// </summary>
         /// <param name="command">Command</param>
+        /// <param name="commandName">Name of the command</param>
         /// <returns>true if sent, false if failed</returns>
-        private bool SendCommand(Command command)
+        private bool SendCommand(Command command, string commandName)
         {
             try
             {
@@ -274,7 +275,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error at sending command: " + ex.Message, Severity.Error);
+                Log($"Error at sending {commandName} command: {ex.Message}", Severity.Error);
                 return false;
             }
 
@@ -286,8 +287,9 @@ namespace RPLidar
         /// </summary>
         /// <param name="command">Command</param>
         /// <param name="payload">Payload</param>
+        /// <param name="commandName">Name of the command</param>
         /// <returns>true if sent, false if failed</returns>
-        private bool SendCommand(Command command, byte[] payload)
+        private bool SendCommand(Command command, byte[] payload, string commandName)
         {
             byte[] data = new byte[4 + payload.Length];
             byte checksum = 0;
@@ -310,7 +312,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error at sending command: " + ex.Message, Severity.Error);
+                Log($"Error at sending command {commandName}: {ex.Message}", Severity.Error);
                 return false;
             }
 
@@ -321,8 +323,9 @@ namespace RPLidar
         /// Read descriptor
         /// </summary>
         /// <param name="descriptor">Descriptor</param>
+        /// <param name="responseName">Name of the response</param>
         /// <returns>true if succeeded, false on failure</returns>
-        private bool ReadDescriptor(out Descriptor descriptor)
+        private bool ReadDescriptor(out Descriptor descriptor, string responseName)
         {
             List<byte> queue = new List<byte>();
             byte[] buffer = new byte[64];
@@ -340,9 +343,14 @@ namespace RPLidar
                 {
                     bytesRead = port.Read(buffer, 0, missingBytes);
                 }
+                catch (TimeoutException)
+                {
+                    Log($"Timeout at receiving descriptor for {responseName}", Severity.Error);
+                    return false;
+                }
                 catch (Exception ex)
                 {
-                    Log("Error at receiving descriptor: " + ex.Message, Severity.Error);
+                    Log($"Error at receiving descriptor for {responseName}: " + ex.Message, Severity.Error);
                     return false;
                 }
 
@@ -367,7 +375,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    Log("Timeout on receiving descriptor", Severity.Error);
+                    Log($"Timeout at receiving descriptor for {responseName}", Severity.Error);
                     return false;
                 }
             }
@@ -378,24 +386,25 @@ namespace RPLidar
         /// </summary>
         /// <param name="readDescriptor">Read descriptor</param>
         /// <param name="expectedDescriptor">Expected descriptor</param>
+        /// <param name="responseName">Name of the response</param>
         /// <returns>true if descriptor received, false if not</returns>
-        private bool CheckDescriptor(Descriptor readDescriptor, Descriptor expectedDescriptor)
+        private bool CheckDescriptor(Descriptor readDescriptor, Descriptor expectedDescriptor, string responseName)
         {
             if ((expectedDescriptor.Length >= 0) && (expectedDescriptor.Length != readDescriptor.Length))
             {
-                Log($"Expected descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}", Severity.Error);
+                Log($"Expected {responseName} descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}", Severity.Error);
                 return false;
             }
 
             if (expectedDescriptor.IsSingle != readDescriptor.IsSingle)
             {
-                Log($"Expected descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}", Severity.Error);
+                Log($"Expected {responseName} descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}", Severity.Error);
                 return false;
             }
 
             if (expectedDescriptor.DataType != readDescriptor.DataType)
             {
-                Log($"Expected descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}", Severity.Error);
+                Log($"Expected {responseName} descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}", Severity.Error);
                 return false;
             }
 
@@ -406,11 +415,12 @@ namespace RPLidar
         /// Wait for descriptor
         /// </summary>
         /// <param name="expectedDescriptor">Descriptor to wait for</param>
+        /// <param name="responseName">Name of the response</param>
         /// <returns>true if descriptor received, false if not</returns>
-        private bool WaitForDescriptor(Descriptor expectedDescriptor)
+        private bool WaitForDescriptor(Descriptor expectedDescriptor, string responseName)
         {
-            if (!ReadDescriptor(out Descriptor readDescriptor)) return false;
-            return CheckDescriptor(readDescriptor, expectedDescriptor);
+            if (!ReadDescriptor(out Descriptor readDescriptor, responseName)) return false;
+            return CheckDescriptor(readDescriptor, expectedDescriptor, responseName);
         }
 
         /// <summary>
@@ -418,8 +428,9 @@ namespace RPLidar
         /// </summary>
         /// <param name="length">Number of bytes to wait for</param>
         /// <param name="data">Received data bytes</param>
+        /// <param name="responseName">Name of the response</param>
         /// <returns>true if response data received, false if not</returns>
-        private bool ReadResponse(int length, out byte[] data)
+        private bool ReadResponse(int length, out byte[] data, string responseName)
         {
             int dataIndex = 0;
             int bytesRead;
@@ -433,9 +444,14 @@ namespace RPLidar
                 {
                     bytesRead = port.Read(data, dataIndex, length - dataIndex);
                 }
+                catch (TimeoutException)
+                {
+                    Log($"Timeout at receiving data for {responseName}", Severity.Error);
+                    return false;
+                }
                 catch (Exception ex)
                 {
-                    Log("Error at reading response: " + ex.Message, Severity.Error);
+                    Log($"Error at receiving data for {responseName}: " + ex.Message, Severity.Error);
                     return false;
                 }
 
@@ -444,7 +460,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    Log("Timeout on receiving data", Severity.Error);
+                    Log($"Timeout at receiving data for {responseName}", Severity.Error);
                     return false;
                 }
             }
@@ -460,27 +476,52 @@ namespace RPLidar
             try
             {
                 port.DiscardInBuffer();
+                port.BaseStream.Flush();
                 return true;
             }
             catch (Exception ex)
             {
-                Log("Error on discarding input buffer: " + ex.Message, Severity.Error);
+                Log("Error on flushing input buffer: " + ex.Message, Severity.Error);
                 return false;
             }
         }
 
         /// <summary>
         /// Reset lidar
+        /// 
+        /// Note: RPLidar specification says that after reset it takes only 2 ms until lidar is ready to receive
+        ///       new commands, however practical tests show that it takes about 700 ms and it also sends out
+        ///       it's version info which must be read or flushed to avoid disturbing following requests.
         /// </summary>
+        /// <param name="waitTime">Number of milliseconds to wait until lidar has restarted</param>
         /// <returns>true if success, false if not</returns>
-        public bool Reset()
+        public bool Reset(int waitTime = 700)
         {
-            if (!SendCommand(Command.Reset)) return false;
-            Thread.Sleep(2);
+            // Send reset command
+            if (!SendCommand(Command.Reset, "reset")) return false;
 
+            // Flush inputs little bit after sending reset command because of the full-duplex and asyncrhonous operation of the serial interface
+            Thread.Sleep(10);
             FlushInput();
             ClearScanBuffer();
-            
+
+            // This is the delay to let lidar truly start up
+            if (waitTime > 10)
+            {
+                Thread.Sleep(waitTime - 10);
+            }
+
+            // If there's something in the input buffer then read it all out and display it
+            if (GetBytesToRead(out int length))
+            {
+                if (length > 0)
+                {
+                    ReadResponse(length, out byte[] data, "reset response");
+                    string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace('\n', ' ');
+                    Log("Reset message: " + msg, Severity.Info);
+                }
+            }
+
             return true;
         }
 
@@ -493,9 +534,9 @@ namespace RPLidar
         {
             info = null;
 
-            if (!SendCommand(Command.GetInfo)) return false;
-            if (!WaitForDescriptor(InfoDescriptor)) return false;
-            if (!ReadResponse(InfoDescriptor.Length, out byte[] data)) return false;
+            if (!SendCommand(Command.GetInfo, "get info")) return false;
+            if (!WaitForDescriptor(InfoDescriptor, "get info")) return false;
+            if (!ReadResponse(InfoDescriptor.Length, out byte[] data, "get info")) return false;
 
             info = new LidarInfo()
             {
@@ -519,9 +560,9 @@ namespace RPLidar
             status = HealthStatus.Unknown;
             errorCode = 0;
 
-            if (!SendCommand(Command.GetHealth)) return false;
-            if (!WaitForDescriptor(HealthDescriptor)) return false;
-            if (!ReadResponse(HealthDescriptor.Length, out byte[] data)) return false;
+            if (!SendCommand(Command.GetHealth, "get health")) return false;
+            if (!WaitForDescriptor(HealthDescriptor, "get health")) return false;
+            if (!ReadResponse(HealthDescriptor.Length, out byte[] data, "get health")) return false;
 
             status = (HealthStatus)data[0];
             errorCode = BitConverter.ToUInt16(data, 1);
@@ -539,6 +580,7 @@ namespace RPLidar
         /// <returns>true if success, false if not</returns>
         private bool GetConfigurationType(ConfigType configType, byte[] requestPayload, int? expectedResponseLength, out byte[] responsePayload)
         {
+            string responseName = "get config";
             responsePayload = new byte[0];
 
             Descriptor expectedDescriptor = new Descriptor(-1, true, 0x20);
@@ -547,16 +589,16 @@ namespace RPLidar
                 expectedDescriptor.Length = expectedResponseLength.Value + 4;
             }
 
-            if (!SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray())) return false;
-            if (!ReadDescriptor(out Descriptor readDescriptor)) return false;
-            if (!CheckDescriptor(readDescriptor, expectedDescriptor)) return false;
-            if (!ReadResponse(readDescriptor.Length, out byte[] responseRaw)) return false;
+            if (!SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray(), responseName)) return false;
+            if (!ReadDescriptor(out Descriptor readDescriptor, responseName)) return false;
+            if (!CheckDescriptor(readDescriptor, expectedDescriptor, responseName)) return false;
+            if (!ReadResponse(readDescriptor.Length, out byte[] responseRaw, responseName)) return false;
 
             // Verify response type
             uint responseType = BitConverter.ToUInt32(responseRaw, 0);
             if (responseType != (byte)configType)
             {
-                Log($"Expected configuration response type 0x{configType:X2}, got 0x{responseType:X2}", Severity.Error);
+                Log($"Expected {responseName} response type 0x{configType:X2}, got 0x{responseType:X2}", Severity.Error);
                 return false;
             }
 

@@ -12,6 +12,9 @@ using RPLidar;
 
 namespace Demo
 {
+    /// <summary>
+    /// Main form
+    /// </summary>
     public partial class MainForm : Form
     {
         private readonly Lidar lidar = new Lidar();
@@ -65,7 +68,7 @@ namespace Demo
         /// <param name="severity"></param>
         private void WriteLog(string message, Severity severity)
         {
-            textLog.AppendText($"{DateTime.Now.ToString("HH:MM:ss.fff")} [{severity}] {message}" + Environment.NewLine);
+            textLog.AppendText(DateTime.Now.ToString("HH:MM:ss.fff") + " " + ("[" + severity + "]").PadRight(10) + " " + message + Environment.NewLine);
             textLog.ScrollToCaret();
         }
 
@@ -76,18 +79,22 @@ namespace Demo
         /// <param name="e"></param>
         private void ButtonStart_Click(object sender, EventArgs e)
         {
-            if (!StartScan())
+            if (SetupLidar() && StartScan())
+            {
+                // Good
+            }
+            else
             {
                 // Close if something failed
-                lidar.Close();
+                StopScan();
             }
         }
 
         /// <summary>
-        /// Start scanning (at least try)
+        /// Setup lidar
         /// </summary>
-        /// <returns></returns>
-        private bool StartScan()
+        /// <returns>true if succeeded, false if not</returns>
+        private bool SetupLidar()
         {
             // Any port selected ?
             if (comboPort.SelectedIndex < 0) return false;
@@ -108,23 +115,38 @@ namespace Demo
 
             // Try to open port
             lidar.PortName = (string)comboPort.SelectedItem;
-            if (!lidar.Open()) return false;
+            return lidar.Open();
+        }
 
-            // Check health
-            if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) return false;
-            labelHealth.Text = health.ToString();
-            if (health != HealthStatus.Good)
+        /// <summary>
+        /// Start scanning (at least try)
+        /// </summary>
+        /// <returns>true if succeeded, false if not</returns>
+        private bool StartScan()
+        {
+            int trials;
+
+            // Try to get lidar into healthy state
+            for (trials = 2; trials > 0; trials--)
             {
-                WriteLog($"Health {health}, error code {errorCode}", Severity.Warning);
+                // Check health
+                if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) continue;
+                labelHealth.Text = health.ToString();
+
+                if (health == HealthStatus.Good)
+                {
+                    WriteLog($"Health good", Severity.Info);
+                    break;
+                }
+                else
+                {
+                    WriteLog($"Health {health}, error code {errorCode}", Severity.Warning);
+                    if (!lidar.Reset()) return false;
+                }
             }
 
-            // Health not good ?
-            if (health != HealthStatus.Good)
-            {
-                if (!lidar.Reset()) return false;
-                WriteLog("Reset done, try open again", Severity.Info);
-                return false;
-            }
+            // Trials left ?
+            if (trials == 0) return false;
 
             // Get configuration
             if (!lidar.GetConfiguration(out Configuration config)) return false;
@@ -156,11 +178,40 @@ namespace Demo
         }
 
         /// <summary>
+        /// Start scanning (at least try)
+        /// </summary>
+        /// <returns>true if succeeded, false if not</returns>
+        private void RestartScan()
+        {
+            WriteLog("Restarting scanning", Severity.Info);
+
+            // Try restaring only once, if it fals then stop scanning
+
+            if (!lidar.Reset())
+            {
+                StopScan();
+            }
+
+            if (!StartScan())
+            {
+                StopScan();
+            }
+        }
+
+        /// <summary>
         /// Stop scan button press
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void ButtonStop_Click(object sender, EventArgs e)
+        {
+            StopScan();
+        }
+
+        /// <summary>
+        /// Stop scanning
+        /// </summary>
+        private void StopScan()
         {
             // Stop scanning
             timerScan.Enabled = false;
@@ -193,7 +244,8 @@ namespace Demo
             // Do scan
             if (!lidar.GetScan(out Scan scan))
             {
-                // Error, should restart
+                // Error, try to restart
+                RestartScan();
                 return;
             }
 

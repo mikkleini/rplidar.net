@@ -33,14 +33,14 @@ namespace RPLidar
             switch (mode)
             {
                 case ScanMode.Legacy:
-                    if (!SendCommand(Command.Scan)) return false;
-                    if (!WaitForDescriptor(LegacyScanDescriptor)) return false;
+                    if (!SendCommand(Command.Scan, "scan")) return false;
+                    if (!WaitForDescriptor(LegacyScanDescriptor, "scan")) return false;
                     activeMode = ScanMode.Legacy;
                     return true;
 
                 case ScanMode.ExpressLegacy:
-                    if (!SendCommand(Command.ExpressScan, new byte[5] { 0, 0, 0, 0, 0 })) return false;
-                    if (!WaitForDescriptor(ExpressLegacyScanDescriptor)) return false;
+                    if (!SendCommand(Command.ExpressScan, new byte[5] { 0, 0, 0, 0, 0 }, "express legacy scan")) return false;
+                    if (!WaitForDescriptor(ExpressLegacyScanDescriptor, "express legacy scan")) return false;
                     activeMode = ScanMode.ExpressLegacy;
                     return true;
 
@@ -59,9 +59,10 @@ namespace RPLidar
         /// <returns>true if success, false if not</returns>
         public bool StopScan()
         {
-            if (!SendCommand(Command.Stop)) return false;
-            Thread.Sleep(1);
+            if (!SendCommand(Command.Stop, "stop")) return false;
+            Thread.Sleep(10); // Spec requires 1 ms but leave some time for serial port to act
 
+            // Flush inputs
             FlushInput();
             ClearScanBuffer();
 
@@ -173,7 +174,7 @@ namespace RPLidar
         {
             // Read all fully available 5 byte packets
             if (!GetBytesToRead(out int bytesToRead)) return false;
-            if (!ReadResponse((bytesToRead / 5) * 5, out byte[] buffer)) return false;
+            if (!ReadResponse((bytesToRead / 5) * 5, out byte[] buffer, "legacy scan")) return false;
 
             // Parse all packets as 5 byte chunks
             for (int i = 0; i < buffer.Length; i += 5)
@@ -223,7 +224,7 @@ namespace RPLidar
             {
                 if (!GetBytesToRead(out int bytesToRead)) return false;
                 if (bytesToRead < ExpressLegacyScanDescriptor.Length) return true;
-                if (!ReadResponse(ExpressLegacyScanDescriptor.Length, out byte[] buffer)) return false;
+                if (!ReadResponse(ExpressLegacyScanDescriptor.Length, out byte[] buffer, "express legacy scan")) return false;
                 if (!ParseExpressLegacyMeasurementsPacket(buffer, bufferedExpressMeasurements, out float startAngle)) return false;
 
                 // Previous start angle available ?
