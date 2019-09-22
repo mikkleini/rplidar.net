@@ -158,6 +158,11 @@ namespace RPLidar
         public bool IsFlipped { get; set; }
 
         /// <summary>
+        /// Angle multiplier
+        /// </summary>
+        private float AngleMultiplier => IsFlipped ? -1.0f : 1.0f;
+
+        /// <summary>
         /// Try to open lidar port
         /// </summary>
         /// <returns>true if port was opened, false if it failed</returns>
@@ -517,7 +522,7 @@ namespace RPLidar
                 if (length > 0)
                 {
                     ReadResponse(length, out byte[] data, "reset response");
-                    string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace('\n', ' ');
+                    string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace("\r\n",  " ");
                     Log("Reset message: " + msg, Severity.Info);
                 }
             }

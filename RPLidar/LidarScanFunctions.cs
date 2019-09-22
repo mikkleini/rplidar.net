@@ -86,14 +86,14 @@ namespace RPLidar
         /// Poll this function until full scan object is returned.
         /// It can only return one 360 degrees scan at once.
         /// </summary>
-        /// <param name="scan">If scan is ready then return Scan object, otherwise null</param>
+        /// <param name="scan">If scan is ready then returns Scan object, otherwise null</param>
         /// <returns>true of operation succeeded, false if not</returns>
-        /// <remarks>Do not use this function while using GetMeasurements</remarks>
+        /// <remarks>Do not use this function while using GetMeasurements or GetMeasurementsUntilNew !</remarks>
         public bool GetScan(out Scan scan)
         {
             scan = null;
 
-            // Get all the new measurements
+            // Get all the received measurements
             if (!GetMeasurements(bufferedMeasurements)) return false;
 
             // Look for new measurements
@@ -121,18 +121,56 @@ namespace RPLidar
                 }
             }
 
-            // Scan not yet ready
             return true;
         }
 
         /// <summary>
-        /// Get new measurements.
+        /// Get measurements until the new scan.
+        /// This is for quick reception of measurement without waiting for the whole 360 scan but compared to
+        /// the GetMeasurements it doesn't mix up previous and new scan measurements.
+        /// </summary>
+        /// <param name="measurements">List which will be updated</param>
+        /// <param name="isLastChunk">Returns true if this is the last chunk of measurements before new scan starts</param>
+        /// <returns>true if operation succeeded, false if something failed</returns>
+        /// <remarks>Operation can succeed even if no new measurements are added to the list</remarks>
+        /// <remarks>Do not use this function while using GetScan or GetMeasurements!</remarks>
+        public bool GetMeasurementsUntilNew(List<Measurement> measurements, out bool isLastChunk)
+        {
+            isLastChunk = false;
+
+            // Get all the received measurements
+            if (!GetMeasurements(bufferedMeasurements)) return false;
+
+            // Look for new measurements
+            for (; bufferedMeasurementsIndex < bufferedMeasurements.Count; bufferedMeasurementsIndex++)
+            {
+                // If it's new and not first measurement then it means one scan has finished.
+                if ((bufferedMeasurementsIndex > 0) && (bufferedMeasurements[bufferedMeasurementsIndex].IsNewScan))
+                {
+                    isLastChunk = true;
+
+                    // Remove already returned measurements from buffer
+                    bufferedMeasurements.RemoveRange(0, bufferedMeasurementsIndex);
+                    bufferedMeasurementsIndex = 0;
+                    break;
+                }
+                else
+                {
+                    measurements.Add(bufferedMeasurements[bufferedMeasurementsIndex]);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Get measurements.
         /// This is for quick reception of measurement without waiting for the whole 360 scan.
         /// </summary>
         /// <param name="measurements">List which will be updated</param>
         /// <returns>true if operation succeeded, false if something failed</returns>
-        /// <remarks>Operation cam succeed even if no new measurements are added to the list</remarks>
-        /// <remarks>Do not use this function while using GetScan !</remarks>
+        /// <remarks>Operation can succeed even if no new measurements are added to the list</remarks>
+        /// <remarks>Do not use this function while using GetScan or GetMeasurementsUntilNew!</remarks>
         public bool GetMeasurements(List<Measurement> measurements)
         {
             // Check port buffer utilization and give warning if it's too high
@@ -202,7 +240,7 @@ namespace RPLidar
                 int quality = buffer[i] >> 2;
 
                 // Do user angular offset calculation
-                angle = ((IsFlipped ? -angle : angle) + AngleOffset) % 360.0f;
+                angle = (angle * AngleMultiplier + AngleOffset) % 360.0f;
 
                 // Add measurement
                 measurements.Add(new Measurement(isNewScan, angle, distance, quality));
@@ -245,18 +283,22 @@ namespace RPLidar
                     // Also add user angular offset
                     for (int i = 0; i < MeasurementsInExpressLegacyScanPacket; i++)
                     {
-                        // Calculate absolute angle
-                        float absAngle = lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle;
+                        Measurement measurement = new Measurement();
 
-                        // Do user angular offset calculation
-                        bufferedExpressMeasurements[i].Angle = ((IsFlipped ? -absAngle : absAngle) + AngleOffset) % 360.0f;
-
-                        // Full rotation ?
-                        // TODO Maybe should check it at every measurement ?
+                        // Full rotation done ?
                         if ((i == 0) && (startAngle < lastExpressScanStartAngle.Value))
                         {
-                            bufferedExpressMeasurements[i].IsNewScan = true;
+                            measurement.IsNewScan = true;
                         }
+
+                        // Calculate absolute angle
+                        measurement.Angle = ((lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle) * AngleMultiplier + AngleOffset) % 360.0f;
+
+                        // Copy the distance
+                        measurement.Distance = bufferedExpressMeasurements[i].Distance;
+
+                        // Update measurement
+                        bufferedExpressMeasurements[i] = measurement;
                     }
 
                     // Move previous packet measurements to return list

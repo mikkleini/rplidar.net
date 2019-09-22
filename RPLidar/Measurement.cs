@@ -7,7 +7,7 @@ namespace RPLidar
     /// <summary>
     /// Single measurement
     /// </summary>
-    public class Measurement
+    public struct Measurement
     {
         /// <summary>
         /// Is scan new ?
@@ -26,6 +26,7 @@ namespace RPLidar
 
         /// <summary>
         /// Reflected signal quality
+        /// Only available on legacy scan mode
         /// </summary>
         public int? Quality { get; internal set; }
 
