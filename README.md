@@ -4,7 +4,7 @@ This a .NET Standard 2.0 library written in C# to interface with Slamtech RPLida
 Tested with:
  - Model A1
  - Windows 10
- - Raspberry Pi 4 (.NET Core 3.0 preview 8 on Raspbian Buster)
+ - Raspberry Pi 4 (.NET Core 3.0 Raspbian Buster)
 
 I took Python RPLidar implementation as a reference in some places:
 https://github.com/Roboticia/RPLidar
