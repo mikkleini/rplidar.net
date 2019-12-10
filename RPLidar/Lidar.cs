@@ -5,13 +5,14 @@ using System.IO.Ports;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using NLog;
 
 namespace RPLidar
 {
     /// <summary>
     /// RPLidar device
     /// </summary>
-    public partial class Lidar : IDisposable
+    public partial class Lidar
     {
         /// <summary>
         /// Command byte
@@ -24,8 +25,8 @@ namespace RPLidar
             Stop = 0x25,
             Reset = 0x40,
             Scan = 0x20,
-            ExpressScan = 0x82
-        };
+            ExpressScan = 0x82,
+        }
 
         /// <summary>
         /// Config type word
@@ -37,8 +38,8 @@ namespace RPLidar
             ScanModeMaxDistance = 0x74,
             ScanModeAnswerType = 0x75,
             ScanModeTypical = 0x7C,
-            ScanModeName = 0x7F
-        };
+            ScanModeName = 0x7F,
+        }
 
         // Constants
         private const byte SyncByte = 0xA5;
@@ -50,19 +51,8 @@ namespace RPLidar
         private readonly Descriptor ExpressLegacyScanDescriptor = new Descriptor(84, false, 0x82);
 
         // Variables
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly SerialPort port;
-
-        /// <summary>
-        /// Logging event hanlder
-        /// </summary>
-        /// <param name="sender">Sending object</param>
-        /// <param name="e">Arguments</param>
-        public delegate void LogEventHandler(object sender, LogEventArgs e);
-
-        /// <summary>
-        /// Logging event
-        /// </summary>
-        public event LogEventHandler OnLog;
 
         /// <summary>
         /// Constructor
@@ -140,7 +130,7 @@ namespace RPLidar
                 }
                 catch (Exception ex)
                 {
-                    Log("Error at checking port status: " + ex.Message, Severity.Error);
+                    logger.Error(ex, "Error at checking port status.");
                     return false;
                 }
             }
@@ -179,7 +169,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error at opening port: " + ex.Message, Severity.Error);
+                logger.Error(ex, "Error at opening port.");
                 return false;
             }
         }
@@ -201,26 +191,8 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error at closing port: " + ex.Message, Severity.Error);
+                logger.Error(ex, "Error at closing port.");
                 return false;
-            }
-        }
-
-        /// <summary>
-        /// Disposing of the class instance
-        /// </summary>
-        public void Dispose()
-        {
-            try
-            {
-                if (port.IsOpen)
-                {
-                    port.Close();
-                }
-            }
-            catch (Exception)
-            {
-                // Ignore
             }
         }
 
@@ -236,20 +208,10 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error at checking bytes to read: " + ex.Message, Severity.Error);
+                logger.Error(ex, "Error at checking readable bytes count.");
                 count = 0;
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Log message
-        /// </summary>
-        /// <param name="message">Log message</param>
-        /// <param name="severity">Message severity</param>
-        private void Log(string message, Severity severity = Severity.Info)
-        {
-            OnLog?.Invoke(this, new LogEventArgs(message, severity));
         }
 
         /// <summary>
@@ -280,7 +242,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log($"Error at sending {commandName} command: {ex.Message}", Severity.Error);
+                logger.Error(ex, $"Error at sending {commandName} command.");
                 return false;
             }
 
@@ -317,7 +279,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log($"Error at sending command {commandName}: {ex.Message}", Severity.Error);
+                logger.Error(ex, $"Error at sending command {commandName}.");
                 return false;
             }
 
@@ -350,12 +312,12 @@ namespace RPLidar
                 }
                 catch (TimeoutException)
                 {
-                    Log($"Timeout at receiving descriptor for {responseName}", Severity.Error);
+                    logger.Error($"Timeout at receiving descriptor for {responseName}.");
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    Log($"Error at receiving descriptor for {responseName}: " + ex.Message, Severity.Error);
+                    logger.Error(ex, $"Error at receiving descriptor for {responseName}.");
                     return false;
                 }
 
@@ -380,7 +342,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    Log($"Timeout at receiving descriptor for {responseName}", Severity.Error);
+                    logger.Error($"Timeout at receiving descriptor for {responseName}.");
                     return false;
                 }
             }
@@ -397,19 +359,19 @@ namespace RPLidar
         {
             if ((expectedDescriptor.Length >= 0) && (expectedDescriptor.Length != readDescriptor.Length))
             {
-                Log($"Expected {responseName} descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}", Severity.Error);
+                logger.Error($"Expected {responseName} descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}.");
                 return false;
             }
 
             if (expectedDescriptor.IsSingle != readDescriptor.IsSingle)
             {
-                Log($"Expected {responseName} descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}", Severity.Error);
+                logger.Error($"Expected {responseName} descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}.");
                 return false;
             }
 
             if (expectedDescriptor.DataType != readDescriptor.DataType)
             {
-                Log($"Expected {responseName} descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}", Severity.Error);
+                logger.Error($"Expected {responseName} descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}.");
                 return false;
             }
 
@@ -451,12 +413,12 @@ namespace RPLidar
                 }
                 catch (TimeoutException)
                 {
-                    Log($"Timeout at receiving data for {responseName}", Severity.Error);
+                    logger.Error($"Timeout at receiving data for {responseName}.");
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    Log($"Error at receiving data for {responseName}: " + ex.Message, Severity.Error);
+                    logger.Error(ex, $"Error at receiving data for {responseName}.");
                     return false;
                 }
 
@@ -465,7 +427,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    Log($"Timeout at receiving data for {responseName}", Severity.Error);
+                    logger.Error($"Timeout at receiving data for {responseName}.");
                     return false;
                 }
             }
@@ -486,7 +448,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                Log("Error on flushing input buffer: " + ex.Message, Severity.Error);
+                logger.Error(ex, "Error on flushing input buffer.");
                 return false;
             }
         }
@@ -522,8 +484,9 @@ namespace RPLidar
                 if (length > 0)
                 {
                     ReadResponse(length, out byte[] data, "reset response");
+                    // Remove line breaks
                     string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace("\r\n",  " ");
-                    Log("Reset message: " + msg, Severity.Info);
+                    logger.Info($"Reset message: {msg}");
                 }
             }
 
@@ -586,7 +549,7 @@ namespace RPLidar
         private bool GetConfigurationType(ConfigType configType, byte[] requestPayload, int? expectedResponseLength, out byte[] responsePayload)
         {
             string responseName = "get config";
-            responsePayload = new byte[0];
+            responsePayload = Array.Empty<byte>();
 
             Descriptor expectedDescriptor = new Descriptor(-1, true, 0x20);
             if (expectedResponseLength.HasValue)
@@ -603,7 +566,7 @@ namespace RPLidar
             uint responseType = BitConverter.ToUInt32(responseRaw, 0);
             if (responseType != (byte)configType)
             {
-                Log($"Expected {responseName} response type 0x{configType:X2}, got 0x{responseType:X2}", Severity.Error);
+                logger.Error($"Expected {responseName} response type 0x{configType:X2}, got 0x{responseType:X2}.");
                 return false;
             }
 
@@ -621,16 +584,14 @@ namespace RPLidar
         /// <returns>true if success, false if not</returns>
         public bool GetConfiguration(out Configuration configuration)
         {
-            byte[] response;
-
             configuration = new Configuration();
 
             // Get typical mode
-            if (!GetConfigurationType(ConfigType.ScanModeTypical, new byte[0], 2, out response)) return false;
+            if (!GetConfigurationType(ConfigType.ScanModeTypical, Array.Empty<byte>(), 2, out byte[] response)) return false;
             configuration.Typical = BitConverter.ToUInt16(response, 0);
 
             // Get number of modes
-            if (!GetConfigurationType(ConfigType.ScanModeCount, new byte[0], 2, out response)) return false;
+            if (!GetConfigurationType(ConfigType.ScanModeCount, Array.Empty<byte>(), 2, out response)) return false;
             ushort count = BitConverter.ToUInt16(response, 0);
 
             // Create configurations of all modes
@@ -642,19 +603,35 @@ namespace RPLidar
                 byte[] modeBytes = BitConverter.GetBytes(mode);
 
                 // Get name
-                if (!GetConfigurationType(ConfigType.ScanModeName, modeBytes, null, out response)) return false;
+                if (!GetConfigurationType(ConfigType.ScanModeName, modeBytes, null, out response))
+                {
+                    return false;
+                }
+
                 modeConfiguration.Name = Encoding.ASCII.GetString(response).TrimEnd('\0');
 
                 // Get microseconds per sample
-                if (!GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4, out response)) return false;
+                if (!GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4, out response))
+                {
+                    return false;
+                }
+
                 modeConfiguration.UsPerSample = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Get maximum distance
-                if (!GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4, out response)) return false;
+                if (!GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4, out response))
+                {
+                    return false;
+                }
+
                 modeConfiguration.MaxDistance = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Ge answer type
-                if (!GetConfigurationType(ConfigType.ScanModeAnswerType, modeBytes, 1, out response)) return false;
+                if (!GetConfigurationType(ConfigType.ScanModeAnswerType, modeBytes, 1, out response))
+                {
+                    return false;
+                }
+
                 modeConfiguration.AnswerType = response[0];
 
                 // Add to list

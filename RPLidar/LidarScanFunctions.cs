@@ -45,11 +45,12 @@ namespace RPLidar
                     return true;
 
                 case ScanMode.ExpressExtended:
-                    Log("Express extended scan not yet supported", Severity.Error);
+                    logger.Error("Express extended scan not yet supported.");
                     return false;
 
                 default:
-                    throw new Exception("Invalid scan mode, could be a bug");
+                    logger.Fatal("Invalid scan mode, could be a bug.");
+                    return false;
             }
         }
 
@@ -178,14 +179,14 @@ namespace RPLidar
             int usage = (100 * bytesToRead) / ReadBufferSize;
             if (usage > 50)
             {
-                Log($"Receive buffer is {usage}% full, should read measurements faster", Severity.Warning);
+                logger.Warn($"Receive buffer is {usage}% full, should read measurements faster.");
             }
 
             // Do the read based on mode
             switch (activeMode)
             {
                 case null:
-                    Log("No scan mode active", Severity.Error);
+                    logger.Error("No scan mode active.");
                     return false;
 
                 case ScanMode.Legacy:
@@ -195,7 +196,7 @@ namespace RPLidar
                     return GetExpressLegacyMeasurements(measurements);
 
                 case ScanMode.ExpressExtended:
-                    Log("Express extended scan not yet supported", Severity.Error);
+                    logger.Error("Express extended scan not yet supported.");
                     return false;
 
                 default:
@@ -223,14 +224,14 @@ namespace RPLidar
                 // Scan flags are inverted ?
                 if (isNewScan == isNewScan2)
                 {
-                    Log("Receieved invalid scan data (start flags not inverted)", Severity.Error);
+                    logger.Error("Receieved invalid scan data (start flags not inverted).");
                     return false;
                 }
 
                 // Check bit set ?
                 if ((buffer[i + 1] & 1) != 1)
                 {
-                    Log("Receieved invalid scan data (check bit not set)", Severity.Error);
+                    logger.Error("Receieved invalid scan data (check bit not set).");
                     return false;
                 }
 
@@ -327,7 +328,7 @@ namespace RPLidar
             // Verify sync bits
             if (((buffer[0] >> 4) != 0xA) || ((buffer[1] >> 4) != 0x5))
             {
-                Log("Received invalid scan packet (invalid sync)", Severity.Error);
+                logger.Error("Received invalid scan packet (invalid sync).");
                 return false;
             }
 
@@ -340,7 +341,7 @@ namespace RPLidar
 
             if (checksum != ((buffer[0] & 0x0F) | ((buffer[1] & 0x0F) << 4)))
             {
-                Log("Received invalid scan packet (invalid checksum)", Severity.Error);
+                logger.Error("Received invalid scan packet (invalid checksum).");
                 return false;
             }
 

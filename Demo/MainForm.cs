@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Ports;
 using RPLidar;
+using NLog;
+using NLog.Windows.Forms;
+using NLog.Config;
 
 namespace Demo
 {
@@ -17,6 +20,7 @@ namespace Demo
     /// </summary>
     public partial class MainForm : Form
     {
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly Lidar lidar = new Lidar();
         private float sps = 0.0f; // sps = Scans per second
 
@@ -45,31 +49,44 @@ namespace Demo
 
             // Setup other things
             comboIsFlipped.SelectedIndex = 0;
-            textAngleOffset.Text = "0";
-
-            // Listen for lidar log events
-            lidar.OnLog += Lidar_OnLog;
+            textAngleOffset.Text = "0";          
         }
 
         /// <summary>
-        /// Lidar log event
+        /// Form loading
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Lidar_OnLog(object sender, LogEventArgs e)
+        private void MainForm_Load(object sender, EventArgs e)
         {
-            WriteLog(e.Message, e.Severity);
+            // Setup form textbox as logging target
+            // Solution from:
+            // https://github.com/NLog/NLog/issues/133#issuecomment-136164391
+
+            RichTextBoxTarget loggerTextBoxTarget = new RichTextBoxTarget
+            {
+                Name = "LogBox",
+                FormName = Name,
+                ControlName = logBox.Name,
+                Layout = "${date:format=HH\\:MM\\:ss.fff} [${logger}] ${message}"
+            };
+
+            LoggingConfiguration logConfig = new LoggingConfiguration();
+            logConfig.AddTarget(loggerTextBoxTarget.Name, loggerTextBoxTarget);
+            logConfig.AddRule(LogLevel.Debug, LogLevel.Fatal, loggerTextBoxTarget);
+            LogManager.Configuration = logConfig;
         }
 
         /// <summary>
-        /// Add message to log window
+        /// Form closed
         /// </summary>
-        /// <param name="text"></param>
-        /// <param name="severity"></param>
-        private void WriteLog(string message, Severity severity)
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
-            textLog.AppendText(DateTime.Now.ToString("HH:MM:ss.fff") + " " + ("[" + severity + "]").PadRight(10) + " " + message + Environment.NewLine);
-            textLog.ScrollToCaret();
+            LoggingConfiguration config = LogManager.Configuration;
+            config.RemoveTarget("LogBox");
+            LogManager.Configuration = config;
         }
 
         /// <summary>
@@ -109,7 +126,7 @@ namespace Demo
             }
             else
             {
-                WriteLog("Invalid angle offset, using zero", Severity.Warning);
+                logger.Warn("Invalid angle offset, using zero.");
                 lidar.AngleOffset = 0.0f;
             }
 
@@ -135,12 +152,12 @@ namespace Demo
 
                 if (health == HealthStatus.Good)
                 {
-                    WriteLog($"Health good", Severity.Info);
+                    logger.Info($"Health good.");
                     break;
                 }
                 else
                 {
-                    WriteLog($"Health {health}, error code {errorCode}", Severity.Warning);
+                    logger.Warn($"Health {health}, error code {errorCode}.");
                     if (!lidar.Reset()) return false;
                 }
             }
@@ -150,11 +167,11 @@ namespace Demo
 
             // Get configuration
             if (!lidar.GetConfiguration(out Configuration config)) return false;
-            WriteLog("Configuration:", Severity.Info);
+            logger.Info("Configuration:");
             foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
             {
-                WriteLog($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
-                    + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty), Severity.Info);
+                logger.Info($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
+                    + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty));
             }
 
             // Start motor and scan
@@ -173,7 +190,7 @@ namespace Demo
             buttonStop.Enabled = true;
 
             // Report
-            WriteLog("Scanning started", Severity.Info);
+            logger.Info("Scanning started.");
             return true;
         }
 
@@ -183,7 +200,7 @@ namespace Demo
         /// <returns>true if succeeded, false if not</returns>
         private void RestartScan()
         {
-            WriteLog("Restarting scanning", Severity.Info);
+            logger.Info("Restarting scanning.");
 
             // Try restaring only once, if it fals then stop scanning
 
@@ -231,7 +248,7 @@ namespace Demo
             buttonStop.Enabled = false;
 
             // Report
-            WriteLog("Scanning stopped", Severity.Info);
+            logger.Info("Scanning stopped.");
         }
 
         /// <summary>
@@ -281,7 +298,7 @@ namespace Demo
         /// <param name="scan"></param>
         private void DrawScan(Image img, Scan scan)
         {
-            Graphics gfx =  Graphics.FromImage(img);
+            Graphics gfx = Graphics.FromImage(img);
             Point center = new Point(img.Width / 2, img.Height / 2);
             float scale = (Math.Min(img.Height, img.Width) / 2) / (float)trackDisplayRange.Value;
             int pointSize = 2;

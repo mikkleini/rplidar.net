@@ -34,9 +34,13 @@
             this.comboPort = new System.Windows.Forms.ToolStripComboBox();
             this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
             this.comboMode = new System.Windows.Forms.ToolStripComboBox();
+            this.buttonIsFlipped = new System.Windows.Forms.ToolStripLabel();
+            this.comboIsFlipped = new System.Windows.Forms.ToolStripComboBox();
+            this.toolStripLabel3 = new System.Windows.Forms.ToolStripLabel();
+            this.textAngleOffset = new System.Windows.Forms.ToolStripTextBox();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.buttonStart = new System.Windows.Forms.ToolStripButton();
             this.buttonStop = new System.Windows.Forms.ToolStripButton();
-            this.textLog = new System.Windows.Forms.TextBox();
             this.splitter1 = new System.Windows.Forms.Splitter();
             this.pictureBox = new System.Windows.Forms.PictureBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
@@ -50,11 +54,7 @@
             this.panel1 = new System.Windows.Forms.Panel();
             this.trackDisplayRange = new System.Windows.Forms.TrackBar();
             this.label1 = new System.Windows.Forms.Label();
-            this.toolStripLabel3 = new System.Windows.Forms.ToolStripLabel();
-            this.textAngleOffset = new System.Windows.Forms.ToolStripTextBox();
-            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            this.buttonIsFlipped = new System.Windows.Forms.ToolStripLabel();
-            this.comboIsFlipped = new System.Windows.Forms.ToolStripComboBox();
+            this.logBox = new System.Windows.Forms.RichTextBox();
             this.toolStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).BeginInit();
             this.statusStrip1.SuspendLayout();
@@ -108,6 +108,39 @@
             this.comboMode.Name = "comboMode";
             this.comboMode.Size = new System.Drawing.Size(131, 23);
             // 
+            // buttonIsFlipped
+            // 
+            this.buttonIsFlipped.Name = "buttonIsFlipped";
+            this.buttonIsFlipped.Size = new System.Drawing.Size(49, 20);
+            this.buttonIsFlipped.Text = "Flipped:";
+            // 
+            // comboIsFlipped
+            // 
+            this.comboIsFlipped.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboIsFlipped.Items.AddRange(new object[] {
+            "No",
+            "Yes"});
+            this.comboIsFlipped.Name = "comboIsFlipped";
+            this.comboIsFlipped.Size = new System.Drawing.Size(75, 23);
+            // 
+            // toolStripLabel3
+            // 
+            this.toolStripLabel3.Name = "toolStripLabel3";
+            this.toolStripLabel3.Size = new System.Drawing.Size(74, 20);
+            this.toolStripLabel3.Text = "Angle offset:";
+            // 
+            // textAngleOffset
+            // 
+            this.textAngleOffset.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.textAngleOffset.Name = "textAngleOffset";
+            this.textAngleOffset.Size = new System.Drawing.Size(50, 23);
+            this.textAngleOffset.Text = "0";
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 23);
+            // 
             // buttonStart
             // 
             this.buttonStart.Enabled = false;
@@ -128,25 +161,12 @@
             this.buttonStop.Text = "Sto&p";
             this.buttonStop.Click += new System.EventHandler(this.ButtonStop_Click);
             // 
-            // textLog
-            // 
-            this.textLog.BackColor = System.Drawing.SystemColors.Window;
-            this.textLog.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.textLog.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(186)));
-            this.textLog.Location = new System.Drawing.Point(0, 433);
-            this.textLog.Multiline = true;
-            this.textLog.Name = "textLog";
-            this.textLog.ReadOnly = true;
-            this.textLog.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.textLog.Size = new System.Drawing.Size(904, 147);
-            this.textLog.TabIndex = 2;
-            // 
             // splitter1
             // 
             this.splitter1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.splitter1.Location = new System.Drawing.Point(0, 428);
+            this.splitter1.Location = new System.Drawing.Point(0, 479);
             this.splitter1.Name = "splitter1";
-            this.splitter1.Size = new System.Drawing.Size(904, 5);
+            this.splitter1.Size = new System.Drawing.Size(860, 5);
             this.splitter1.TabIndex = 3;
             this.splitter1.TabStop = false;
             // 
@@ -156,7 +176,7 @@
             this.pictureBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pictureBox.Location = new System.Drawing.Point(0, 27);
             this.pictureBox.Name = "pictureBox";
-            this.pictureBox.Size = new System.Drawing.Size(860, 401);
+            this.pictureBox.Size = new System.Drawing.Size(860, 553);
             this.pictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
             this.pictureBox.TabIndex = 1;
             this.pictureBox.TabStop = false;
@@ -244,7 +264,7 @@
             this.panel1.Dock = System.Windows.Forms.DockStyle.Right;
             this.panel1.Location = new System.Drawing.Point(860, 27);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(44, 401);
+            this.panel1.Size = new System.Drawing.Size(44, 553);
             this.panel1.TabIndex = 6;
             // 
             // trackDisplayRange
@@ -255,7 +275,7 @@
             this.trackDisplayRange.Minimum = 1;
             this.trackDisplayRange.Name = "trackDisplayRange";
             this.trackDisplayRange.Orientation = System.Windows.Forms.Orientation.Vertical;
-            this.trackDisplayRange.Size = new System.Drawing.Size(44, 388);
+            this.trackDisplayRange.Size = new System.Drawing.Size(44, 540);
             this.trackDisplayRange.TabIndex = 6;
             this.trackDisplayRange.TickStyle = System.Windows.Forms.TickStyle.TopLeft;
             this.trackDisplayRange.Value = 1;
@@ -270,53 +290,31 @@
             this.label1.TabIndex = 7;
             this.label1.Text = "Range:";
             // 
-            // toolStripLabel3
+            // logBox
             // 
-            this.toolStripLabel3.Name = "toolStripLabel3";
-            this.toolStripLabel3.Size = new System.Drawing.Size(74, 20);
-            this.toolStripLabel3.Text = "Angle offset:";
-            // 
-            // textAngleOffset
-            // 
-            this.textAngleOffset.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.textAngleOffset.Name = "textAngleOffset";
-            this.textAngleOffset.Size = new System.Drawing.Size(50, 23);
-            this.textAngleOffset.Text = "0";
-            // 
-            // toolStripSeparator1
-            // 
-            this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 23);
-            // 
-            // buttonIsFlipped
-            // 
-            this.buttonIsFlipped.Name = "buttonIsFlipped";
-            this.buttonIsFlipped.Size = new System.Drawing.Size(49, 20);
-            this.buttonIsFlipped.Text = "Flipped:";
-            // 
-            // comboIsFlipped
-            // 
-            this.comboIsFlipped.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.comboIsFlipped.Items.AddRange(new object[] {
-            "No",
-            "Yes"});
-            this.comboIsFlipped.Name = "comboIsFlipped";
-            this.comboIsFlipped.Size = new System.Drawing.Size(75, 23);
+            this.logBox.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.logBox.Location = new System.Drawing.Point(0, 484);
+            this.logBox.Name = "logBox";
+            this.logBox.Size = new System.Drawing.Size(860, 96);
+            this.logBox.TabIndex = 7;
+            this.logBox.Text = "";
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(904, 604);
+            this.Controls.Add(this.splitter1);
+            this.Controls.Add(this.logBox);
             this.Controls.Add(this.pictureBox);
             this.Controls.Add(this.panel1);
-            this.Controls.Add(this.splitter1);
-            this.Controls.Add(this.textLog);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.toolStrip1);
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "RPLidar.NET demo";
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.MainForm_FormClosed);
+            this.Load += new System.EventHandler(this.MainForm_Load);
             this.toolStrip1.ResumeLayout(false);
             this.toolStrip1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).EndInit();
@@ -337,7 +335,6 @@
         private System.Windows.Forms.ToolStripButton buttonStart;
         private System.Windows.Forms.ToolStripButton buttonStop;
         private System.Windows.Forms.PictureBox pictureBox;
-        private System.Windows.Forms.TextBox textLog;
         private System.Windows.Forms.Splitter splitter1;
         private System.Windows.Forms.ToolStripComboBox comboPort;
         private System.Windows.Forms.ToolStripLabel toolStripLabel2;
@@ -358,6 +355,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripLabel buttonIsFlipped;
         private System.Windows.Forms.ToolStripComboBox comboIsFlipped;
+        private System.Windows.Forms.RichTextBox logBox;
     }
 }
 
