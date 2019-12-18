@@ -127,6 +127,7 @@
             // 
             // textAngleOffset
             // 
+            this.textAngleOffset.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.textAngleOffset.Name = "textAngleOffset";
             this.textAngleOffset.Size = new System.Drawing.Size(50, 23);
             this.textAngleOffset.Text = "0";

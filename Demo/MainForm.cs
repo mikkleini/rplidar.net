@@ -23,6 +23,7 @@ namespace Demo
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly Lidar lidar = new Lidar();
+        private delegate void UpdateScanDelegate(Scan scan);
         private float sps = 0.0f; // sps = Scans per second
         private CancellationTokenSource cancellationSource;
         private Task lidarTask;
@@ -287,28 +288,12 @@ namespace Demo
                 Scan scan = await lidar.GetScan(cancellationToken);
                 if (scan == null)
                 {
+                    // Failed, need to restart
                     return false;
                 }
 
-                // Draw scan
-                Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
-                DrawScan(bmp, scan);
-                pictureBox.Image = bmp;
-
-                // Calculate scan per second with low pass filtering
-                float fScan = 1000.0f / Math.Max(1, scan.Duration);
-                if (sps <= float.Epsilon)
-                {
-                    sps = fScan;
-                }
-                else
-                {
-                    sps = (sps + fScan) / 2.0f;
-                }
-
-                // Show SpS
-                labelSPC.Text = sps.ToString("f2");
-                labelPPS.Text = scan.Measurements.Count.ToString();
+                // Display it
+                BeginInvoke(new UpdateScanDelegate(UpdateScan), new object[] { scan });
             }
 
             // Normal exit
@@ -316,10 +301,26 @@ namespace Demo
         }
 
         /// <summary>
-        /// Draw scan
+        /// Update scan
         /// </summary>
-        /// <param name="img"></param>
-        /// <param name="scan"></param>
+        /// <param name="scan">Scan object</param>
+        private void UpdateScan(Scan scan)
+        {
+            // Draw scan image
+            Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
+            DrawScan(bmp, scan);
+            pictureBox.Image = bmp;
+
+            // Show stats
+            labelSPC.Text = scan.ScanRate.ToString("f2");
+            labelPPS.Text = scan.Measurements.Count.ToString();
+        }
+
+        /// <summary>
+        /// Draw scan image
+        /// </summary>
+        /// <param name="img">Image to draw</param>
+        /// <param name="scan">Scan object</param>
         private void DrawScan(Image img, Scan scan)
         {
             Graphics gfx = Graphics.FromImage(img);

@@ -130,6 +130,7 @@ namespace RPLidar
                         if (lastScanTimestamp.HasValue)
                         {
                             scan.Duration = (int)(timestampNow - lastScanTimestamp);
+                            scan.ScanRate = 1000.0f / (float)scan.Duration;
                         }
                         lastScanTimestamp = timestampNow;
 
@@ -141,8 +142,14 @@ namespace RPLidar
                     }
                 }
 
-                // Get more measurements
-                bufferedScanMeasurements.AddRange(await GetMeasurements(cancellationToken));
+                // Try to get more measurements
+                var newMeasurements = await GetMeasurements(cancellationToken);
+                if (newMeasurements == null)
+                {
+                    return null;
+                }
+
+                bufferedScanMeasurements.AddRange(newMeasurements);
             }
         }
 
@@ -175,8 +182,14 @@ namespace RPLidar
                     }
                 }
 
-                // Get more measurements
-                bufferedScanMeasurements.AddRange(await GetMeasurements(cancellationToken));
+                // Try to get more measurements
+                var newMeasurements = await GetMeasurements(cancellationToken);
+                if (newMeasurements == null)
+                {
+                    return null;
+                }
+
+                bufferedScanMeasurements.AddRange(newMeasurements);
             }
         }
 

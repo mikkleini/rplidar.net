@@ -410,7 +410,7 @@ namespace RPLidar
             {
                 try
                 {
-                    bytesRead = await port.BaseStream.ReadAsync(data, dataIndex, length - dataIndex);
+                    bytesRead = await port.ReadAsync(data, dataIndex, length - dataIndex);
                 }
                 catch (TimeoutException)
                 {
