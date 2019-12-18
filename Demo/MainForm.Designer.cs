@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.toolStripLabel1 = new System.Windows.Forms.ToolStripLabel();
             this.comboPort = new System.Windows.Forms.ToolStripComboBox();
@@ -44,13 +43,10 @@
             this.splitter1 = new System.Windows.Forms.Splitter();
             this.pictureBox = new System.Windows.Forms.PictureBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
-            this.toolStripStatusLabel1 = new System.Windows.Forms.ToolStripStatusLabel();
-            this.labelHealth = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel2 = new System.Windows.Forms.ToolStripStatusLabel();
             this.labelSPC = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel3 = new System.Windows.Forms.ToolStripStatusLabel();
             this.labelPPS = new System.Windows.Forms.ToolStripStatusLabel();
-            this.timerScan = new System.Windows.Forms.Timer(this.components);
             this.panel1 = new System.Windows.Forms.Panel();
             this.trackDisplayRange = new System.Windows.Forms.TrackBar();
             this.label1 = new System.Windows.Forms.Label();
@@ -131,7 +127,6 @@
             // 
             // textAngleOffset
             // 
-            this.textAngleOffset.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.textAngleOffset.Name = "textAngleOffset";
             this.textAngleOffset.Size = new System.Drawing.Size(50, 23);
             this.textAngleOffset.Text = "0";
@@ -184,8 +179,6 @@
             // statusStrip1
             // 
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripStatusLabel1,
-            this.labelHealth,
             this.toolStripStatusLabel2,
             this.labelSPC,
             this.toolStripStatusLabel3,
@@ -195,24 +188,6 @@
             this.statusStrip1.Size = new System.Drawing.Size(904, 24);
             this.statusStrip1.TabIndex = 4;
             this.statusStrip1.Text = "statusStrip1";
-            // 
-            // toolStripStatusLabel1
-            // 
-            this.toolStripStatusLabel1.Name = "toolStripStatusLabel1";
-            this.toolStripStatusLabel1.Size = new System.Drawing.Size(45, 19);
-            this.toolStripStatusLabel1.Text = "Health:";
-            // 
-            // labelHealth
-            // 
-            this.labelHealth.AutoSize = false;
-            this.labelHealth.BorderSides = ((System.Windows.Forms.ToolStripStatusLabelBorderSides)((((System.Windows.Forms.ToolStripStatusLabelBorderSides.Left | System.Windows.Forms.ToolStripStatusLabelBorderSides.Top) 
-            | System.Windows.Forms.ToolStripStatusLabelBorderSides.Right) 
-            | System.Windows.Forms.ToolStripStatusLabelBorderSides.Bottom)));
-            this.labelHealth.BorderStyle = System.Windows.Forms.Border3DStyle.SunkenOuter;
-            this.labelHealth.Name = "labelHealth";
-            this.labelHealth.Size = new System.Drawing.Size(100, 19);
-            this.labelHealth.Text = "-";
-            this.labelHealth.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // toolStripStatusLabel2
             // 
@@ -251,11 +226,6 @@
             this.labelPPS.Size = new System.Drawing.Size(50, 19);
             this.labelPPS.Text = "-";
             this.labelPPS.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
-            // timerScan
-            // 
-            this.timerScan.Interval = 20;
-            this.timerScan.Tick += new System.EventHandler(this.TimerScan_Tick);
             // 
             // panel1
             // 
@@ -340,9 +310,6 @@
         private System.Windows.Forms.ToolStripLabel toolStripLabel2;
         private System.Windows.Forms.ToolStripComboBox comboMode;
         private System.Windows.Forms.StatusStrip statusStrip1;
-        private System.Windows.Forms.Timer timerScan;
-        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel1;
-        private System.Windows.Forms.ToolStripStatusLabel labelHealth;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel2;
         private System.Windows.Forms.ToolStripStatusLabel labelSPC;
         private System.Windows.Forms.Panel panel1;
