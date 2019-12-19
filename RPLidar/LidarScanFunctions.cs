@@ -341,29 +341,23 @@ namespace RPLidar
                     List<Measurement> measurements = new List<Measurement>(MeasurementsInExpressLegacyScanPacket);
 
                     // Calculate real angles of previous packet measurements
-                    // Also add user angular offset
                     for (int i = 0; i < MeasurementsInExpressLegacyScanPacket; i++)
                     {
-                        Measurement measurement = new Measurement();
-
-                        // Full rotation done ?
-                        if ((i == 0) && (startAngle < lastExpressScanStartAngle.Value))
+                        // Add measurement
+                        measurements.Add(new Measurement()
                         {
-                            measurement.IsNewScan = true;
-                        }
+                            // Full rotation done ?
+                            IsNewScan = (i == 0) && (startAngle < lastExpressScanStartAngle.Value),
 
-                        // Calculate absolute angle
-                        measurement.Angle = ((lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle) * AngleMultiplier + AngleOffset) % 360.0f;
+                            // Calculate absolute angle and do the angular and flip compensation
+                            Angle = ((lastExpressScanStartAngle.Value + angleFraction * i - bufferedExpressMeasurements[i].Angle) * AngleMultiplier + AngleOffset) % 360.0f,
 
-                        // Copy the distance
-                        measurement.Distance = bufferedExpressMeasurements[i].Distance;
-
-                        // Update measurement
-                        bufferedExpressMeasurements[i] = measurement;
+                            // Get distance
+                            Distance = bufferedExpressMeasurements[i].Distance
+                        });
                     }
 
-                    // Move previous packet measurements to return list
-                    measurements.AddRange(bufferedExpressMeasurements.Take(MeasurementsInExpressLegacyScanPacket));
+                    // Remove previous packet measurements from buffer
                     bufferedExpressMeasurements.RemoveRange(0, MeasurementsInExpressLegacyScanPacket);
 
                     // Remember this packets angle
