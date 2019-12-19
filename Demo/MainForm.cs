@@ -24,7 +24,6 @@ namespace Demo
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly Lidar lidar = new Lidar();
         private delegate void UpdateScanDelegate(Scan scan);
-        private float sps = 0.0f; // sps = Scans per second
         private CancellationTokenSource cancellationSource;
         private Task lidarTask;
 
@@ -258,7 +257,6 @@ namespace Demo
             }
 
             // Report
-            sps = 0.0f;
             logger.Info("Scanning started.");
 
             return true;
