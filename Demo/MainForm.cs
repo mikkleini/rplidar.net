@@ -284,8 +284,8 @@ namespace Demo
                 Scan scan = await lidar.GetScan(cancellationToken);
                 if (scan == null)
                 {
-                    // Failed, need to restart
-                    return false;
+                    // It was either cancellation or error
+                    return cancellationToken.IsCancellationRequested;
                 }
 
                 // Display it

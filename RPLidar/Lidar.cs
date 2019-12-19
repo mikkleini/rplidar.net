@@ -441,57 +441,6 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Read response
-        /// </summary>
-        /// <param name="length">Number of bytes to wait for</param>
-        /// <param name="responseName">Name of the response</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Received data bytes or empty array in case of error</returns>
-        private async Task<byte[]> ReadResponse(int length, string responseName, CancellationToken cancellationToken)
-        {
-            int dataIndex = 0;
-            int bytesRead;
-            long startTime = Timestamp;
-            byte[] data = new byte[length];
-
-            // Get required number of data bytes
-            while (dataIndex < length)
-            {
-                try
-                {
-                    bytesRead = await port.BaseStream.ReadAsync(data, dataIndex, length - dataIndex, cancellationToken);
-                }
-                catch (TimeoutException)
-                {
-                    Logger.LogError($"Timeout at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, $"Error at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-
-                // Cancelled ?
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return Array.Empty<byte>();
-                }
-
-                dataIndex += bytesRead;
-
-                // Timeout ?
-                if ((Timestamp - startTime) > ReceiveTimeout)
-                {
-                    Logger.LogError($"Timeout at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-            }
-
-            return data;
-        }
-
-        /// <summary>
         /// Flush input buffer
         /// </summary>
         private bool FlushInput()
