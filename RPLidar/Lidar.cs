@@ -62,7 +62,7 @@ namespace RPLidar
         {
             port = new SerialPort()
             {
-                ReadTimeout = 500,
+                ReadTimeout = 1000,
                 ReadBufferSize = 32768,
                 BaudRate = 115200
             };

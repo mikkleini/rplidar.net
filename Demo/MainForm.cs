@@ -72,7 +72,7 @@ namespace Demo
                 Name = "LogBox",
                 FormName = Name,
                 ControlName = logBox.Name,
-                Layout = "${date:format=HH\\:MM\\:ss.fff} [${logger}] ${message}"
+                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message}"
             };
 
             LoggingConfiguration logConfig = new LoggingConfiguration();
@@ -159,7 +159,7 @@ namespace Demo
             }
             if (lidarTask != null)
             {
-                lidarTask.Wait();
+                lidarTask.GetAwaiter().GetResult();
             }
 
             // Close port

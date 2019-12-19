@@ -254,7 +254,6 @@ namespace RPLidar
 
             // Round down to fully available scan bytes but always try to read at least one scan
             bytesToRead = Math.Max(5, (bytesToRead / 5) * 5);
-
             byte[] buffer = await ReadResponse(bytesToRead, "legacy scan");
             if (buffer.Length == 0)
             {
@@ -311,23 +310,14 @@ namespace RPLidar
             // the next packet start angle is used to calculate absolute angle of previous scan samples
             while (true)
             {
-                if (!GetBytesToRead(out int bytesToRead))
-                {
-                    return null;
-                }
-
-                // Nothing new ?
-                if (bytesToRead < ExpressLegacyScanDescriptor.Length)
-                {
-                    return null;
-                }
-
+                // Read one packet
                 byte[] buffer = await ReadResponse(ExpressLegacyScanDescriptor.Length, "express legacy scan");
                 if (buffer.Length == 0)
                 {
                     return null;
                 }
 
+                // Parse the packet
                 if (!ParseExpressLegacyMeasurementsPacket(buffer, bufferedExpressMeasurements, out float startAngle))
                 {
                     return null;
@@ -375,6 +365,12 @@ namespace RPLidar
                     // Move previous packet measurements to return list
                     measurements.AddRange(bufferedExpressMeasurements.Take(MeasurementsInExpressLegacyScanPacket));
                     bufferedExpressMeasurements.RemoveRange(0, MeasurementsInExpressLegacyScanPacket);
+
+                    // Remember this packets angle
+                    lastExpressScanStartAngle = startAngle;
+
+                    // Return measurements
+                    return measurements;
                 }
 
                 // Remember this packets angle
