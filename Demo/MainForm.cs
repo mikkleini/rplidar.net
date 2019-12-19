@@ -5,14 +5,16 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Ports;
 using RPLidar;
-using NLog;
-using NLog.Windows.Forms;
+using Microsoft.Extensions.Logging;
 using NLog.Config;
-using System.Threading;
+using NLog.Windows.Forms;
+using NLog.Extensions.Logging;
+using LogLevel = NLog.LogLevel;
 
 namespace Demo
 {
@@ -21,7 +23,7 @@ namespace Demo
     /// </summary>
     public partial class MainForm : Form
     {
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private Microsoft.Extensions.Logging.ILogger logger;
         private readonly Lidar lidar = new Lidar();
         private delegate void UpdateScanDelegate(Scan scan);
         private CancellationTokenSource cancellationSource;
@@ -52,7 +54,7 @@ namespace Demo
 
             // Setup other things
             comboIsFlipped.SelectedIndex = 0;
-            textAngleOffset.Text = "0";          
+            textAngleOffset.Text = "0";
         }
 
         /// <summary>
@@ -78,19 +80,13 @@ namespace Demo
             LoggingConfiguration logConfig = new LoggingConfiguration();
             logConfig.AddTarget(loggerTextBoxTarget.Name, loggerTextBoxTarget);
             logConfig.AddRule(LogLevel.Debug, LogLevel.Fatal, loggerTextBoxTarget);
-            LogManager.Configuration = logConfig;
-        }
 
-        /// <summary>
-        /// Form closed
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            LoggingConfiguration config = LogManager.Configuration;
-            config.RemoveTarget("LogBox");
-            LogManager.Configuration = config;
+            // Create MS logger
+            using (ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddNLog(logConfig)))
+            {
+                logger = loggerFactory.CreateLogger("Demo");
+                lidar.Logger = loggerFactory.CreateLogger("Lidar");
+            }
         }
 
         /// <summary>
@@ -103,14 +99,14 @@ namespace Demo
             // Parse mode
             if (!Enum.TryParse(comboMode.SelectedItem.ToString(), out ScanMode mode))
             {
-                logger.Error($"Invalid scan mode: {comboMode.SelectedItem.ToString()}");
+                logger.LogError($"Invalid scan mode: {comboMode.SelectedItem.ToString()}");
                 return;
             }
 
             // Decide port
             if (comboPort.SelectedIndex < 0)
             {
-                logger.Error($"No port selected");
+                logger.LogError($"No port selected");
                 return;
             }
             lidar.PortName = (string)comboPort.SelectedItem;
@@ -125,7 +121,7 @@ namespace Demo
             }
             else
             {
-                logger.Warn("Invalid angle offset, using zero.");
+                logger.LogWarning("Invalid angle offset, using zero.");
                 lidar.AngleOffset = 0.0f;
             }
 
@@ -225,12 +221,12 @@ namespace Demo
             // Good health ?
             if (health.Status != HealthStatus.Good)
             {
-                logger.Warn($"Health {health.Status}, error code {health.ErrorCode}.");
+                logger.LogWarning($"Health {health.Status}, error code {health.ErrorCode}.");
                 return false;
             }
 
             // Good health
-            logger.Info($"Health good.");
+            logger.LogInformation($"Health good.");
 
             // Get configuration
             Configuration config = await lidar.GetConfiguration();
@@ -240,10 +236,10 @@ namespace Demo
             }
 
             // Show configuration
-            logger.Info("Configuration:");
+            logger.LogInformation("Configuration:");
             foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
             {
-                logger.Info($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
+                logger.LogInformation($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
                     + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty));
             }
 
@@ -257,7 +253,7 @@ namespace Demo
             }
 
             // Report
-            logger.Info("Scanning started.");
+            logger.LogInformation("Scanning started.");
 
             return true;
         }
@@ -272,7 +268,7 @@ namespace Demo
             lidar.ControlMotorDtr(true);
 
             // Report
-            logger.Info("Scanning stopped");
+            logger.LogInformation("Scanning stopped");
         }
 
         /// <summary>

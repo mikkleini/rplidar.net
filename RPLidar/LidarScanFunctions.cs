@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace RPLidar
 {
@@ -61,11 +62,11 @@ namespace RPLidar
                     return true;
 
                 case ScanMode.ExpressExtended:
-                    logger.Error("Express extended scan not yet supported.");
+                    Logger.LogError("Express extended scan not yet supported.");
                     return false;
 
                 default:
-                    logger.Fatal("Invalid scan mode, could be a bug.");
+                    Logger.LogCritical("Invalid scan mode, could be a bug.");
                     return false;
             }
         }
@@ -212,14 +213,14 @@ namespace RPLidar
             int usage = (100 * bytesToRead) / ReadBufferSize;
             if (usage > 50)
             {
-                logger.Warn($"Receive buffer is {usage}% full, should read measurements faster.");
+                Logger.LogWarning($"Receive buffer is {usage}% full, should read measurements faster.");
             }
 
             // Do the read based on mode
             switch (activeMode)
             {
                 case null:
-                    logger.Error("No scan mode active.");
+                    Logger.LogError("No scan mode active.");
                     return null;
 
                 case ScanMode.Legacy:
@@ -229,11 +230,11 @@ namespace RPLidar
                     return await GetExpressLegacyMeasurements(cancellationToken);
 
                 case ScanMode.ExpressExtended:
-                    logger.Error("Express extended scan not yet supported.");
+                    Logger.LogError("Express extended scan not yet supported.");
                     return null;
 
                 default:
-                    logger.Fatal($"Invalid scan mode '{activeMode}', it could be a bug");
+                    Logger.LogCritical($"Invalid scan mode '{activeMode}', it could be a bug");
                     return null;
             }
         }
@@ -272,14 +273,14 @@ namespace RPLidar
                 // Scan flags are inverted ?
                 if (isNewScan == isNewScan2)
                 {
-                    logger.Error("Receieved invalid scan data (start flags not inverted).");
+                    Logger.LogError("Receieved invalid scan data (start flags not inverted).");
                     return null;
                 }
 
                 // Check bit set ?
                 if ((buffer[i + 1] & 1) != 1)
                 {
-                    logger.Error("Receieved invalid scan data (check bit not set).");
+                    Logger.LogError("Receieved invalid scan data (check bit not set).");
                     return null;
                 }
 
@@ -388,7 +389,7 @@ namespace RPLidar
             // Verify sync bits
             if (((buffer[0] >> 4) != 0xA) || ((buffer[1] >> 4) != 0x5))
             {
-                logger.Error("Received invalid scan packet (invalid sync).");
+                Logger.LogError("Received invalid scan packet (invalid sync).");
                 return false;
             }
 
@@ -401,7 +402,7 @@ namespace RPLidar
 
             if (checksum != ((buffer[0] & 0x0F) | ((buffer[1] & 0x0F) << 4)))
             {
-                logger.Error("Received invalid scan packet (invalid checksum).");
+                Logger.LogError("Received invalid scan packet (invalid checksum).");
                 return false;
             }
 
