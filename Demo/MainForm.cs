@@ -72,7 +72,8 @@ namespace Demo
                 Name = "LogBox",
                 FormName = Name,
                 ControlName = logBox.Name,
-                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message}"
+                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message}",
+                AutoScroll = true
             };
 
             LoggingConfiguration logConfig = new LoggingConfiguration();
