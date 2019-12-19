@@ -23,7 +23,7 @@ namespace Demo
     /// </summary>
     public partial class MainForm : Form
     {
-        private Microsoft.Extensions.Logging.ILogger logger;
+        private ILogger logger;
         private readonly Lidar lidar = new Lidar();
         private delegate void UpdateScanDelegate(Scan scan);
         private CancellationTokenSource cancellationSource;
@@ -73,7 +73,7 @@ namespace Demo
                 Name = "LogBox",
                 FormName = Name,
                 ControlName = logBox.Name,
-                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message}",
+                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message} ${exception:format=Message}",
                 AutoScroll = true
             };
 
@@ -186,8 +186,9 @@ namespace Demo
                 // Try to start lidar
                 if (!await StartLidar(mode))
                 {
-                    // Reset and try to start again
-                    await lidar.Reset();                    
+                    // Reset and try to start again in a while to avoid high CPU load if something breaks
+                    await lidar.Reset();
+                    await Task.Delay(1000);
                     continue;
                 }
 

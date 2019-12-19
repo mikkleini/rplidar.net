@@ -551,8 +551,8 @@ namespace RPLidar
                     return false;
                 }
 
-                // Convert to ASCII and remove line breaks
-                string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace("\r\n", " ").Replace("\n", "");
+                // Convert to ASCII and replace control characters with space
+                string msg = new string(data.Select(b => b < 0x20 ? ' ' : (char)b).ToArray());
                 Logger.LogInformation($"Reset message: {msg}");
             }
 
