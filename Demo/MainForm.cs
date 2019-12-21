@@ -12,6 +12,7 @@ using RPLidar;
 using NLog;
 using NLog.Windows.Forms;
 using NLog.Config;
+using System.Threading;
 
 namespace Demo
 {
@@ -22,7 +23,10 @@ namespace Demo
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly Lidar lidar = new Lidar();
+        private delegate void UpdateScanDelegate(Scan scan);
         private float sps = 0.0f; // sps = Scans per second
+        private CancellationTokenSource cancellationSource;
+        private Task lidarTask;
 
         /// <summary>
         /// Constructor
@@ -68,7 +72,8 @@ namespace Demo
                 Name = "LogBox",
                 FormName = Name,
                 ControlName = logBox.Name,
-                Layout = "${date:format=HH\\:MM\\:ss.fff} [${logger}] ${message}"
+                Layout = "${date:format=HH\\:mm\\:ss.fff} [${logger}] ${message}",
+                AutoScroll = true
             };
 
             LoggingConfiguration logConfig = new LoggingConfiguration();
@@ -96,25 +101,20 @@ namespace Demo
         /// <param name="e"></param>
         private void ButtonStart_Click(object sender, EventArgs e)
         {
-            if (SetupLidar() && StartScan())
+            // Parse mode
+            if (!Enum.TryParse(comboMode.SelectedItem.ToString(), out ScanMode mode))
             {
-                // Good
+                logger.Error($"Invalid scan mode: {comboMode.SelectedItem.ToString()}");
+                return;
             }
-            else
-            {
-                // Close if something failed
-                StopScan();
-            }
-        }
 
-        /// <summary>
-        /// Setup lidar
-        /// </summary>
-        /// <returns>true if succeeded, false if not</returns>
-        private bool SetupLidar()
-        {
-            // Any port selected ?
-            if (comboPort.SelectedIndex < 0) return false;
+            // Decide port
+            if (comboPort.SelectedIndex < 0)
+            {
+                logger.Error($"No port selected");
+                return;
+            }
+            lidar.PortName = (string)comboPort.SelectedItem;
 
             // Flipped ?
             lidar.IsFlipped = comboIsFlipped.SelectedIndex == 1;
@@ -131,87 +131,17 @@ namespace Demo
             }
 
             // Try to open port
-            lidar.PortName = (string)comboPort.SelectedItem;
-            return lidar.Open();
-        }
-
-        /// <summary>
-        /// Start scanning (at least try)
-        /// </summary>
-        /// <returns>true if succeeded, false if not</returns>
-        private bool StartScan()
-        {
-            int trials;
-
-            // Try to get lidar into healthy state
-            for (trials = 2; trials > 0; trials--)
+            if (lidar.Open())
             {
-                // Check health
-                if (!lidar.GetHealth(out HealthStatus health, out ushort errorCode)) continue;
-                labelHealth.Text = health.ToString();
+                // Allow stopping
+                comboPort.Enabled = false;
+                comboMode.Enabled = false;
+                buttonStart.Enabled = false;
+                buttonStop.Enabled = true;
 
-                if (health == HealthStatus.Good)
-                {
-                    logger.Info($"Health good.");
-                    break;
-                }
-                else
-                {
-                    logger.Warn($"Health {health}, error code {errorCode}.");
-                    if (!lidar.Reset()) return false;
-                }
-            }
-
-            // Trials left ?
-            if (trials == 0) return false;
-
-            // Get configuration
-            if (!lidar.GetConfiguration(out Configuration config)) return false;
-            logger.Info("Configuration:");
-            foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
-            {
-                logger.Info($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
-                    + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty));
-            }
-
-            // Start motor and scan
-            lidar.ControlMotorDtr(true);
-            if (!Enum.TryParse<ScanMode>(comboMode.SelectedItem.ToString(), out ScanMode mode)) return false;
-            if (!lidar.StartScan(mode)) return false;
-            sps = 0.0f;
-            
-            // Scan started, now poll for results
-            timerScan.Enabled = true;
-
-            // Can't re-open, but can close
-            comboPort.Enabled = false;
-            comboMode.Enabled = false;
-            buttonStart.Enabled = false;
-            buttonStop.Enabled = true;
-
-            // Report
-            logger.Info("Scanning started.");
-            return true;
-        }
-
-        /// <summary>
-        /// Start scanning (at least try)
-        /// </summary>
-        /// <returns>true if succeeded, false if not</returns>
-        private void RestartScan()
-        {
-            logger.Info("Restarting scanning.");
-
-            // Try restaring only once, if it fals then stop scanning
-
-            if (!lidar.Reset())
-            {
-                StopScan();
-            }
-
-            if (!StartScan())
-            {
-                StopScan();
+                // Start scan task
+                cancellationSource = new CancellationTokenSource();
+                lidarTask = Task.Run(() => Scan(mode, cancellationSource.Token));
             }
         }
 
@@ -222,80 +152,176 @@ namespace Demo
         /// <param name="e"></param>
         private void ButtonStop_Click(object sender, EventArgs e)
         {
-            StopScan();
-        }
+            // Cancel scanning
+            if (cancellationSource != null)
+            {
+                cancellationSource.Cancel();
+                cancellationSource.Dispose();
+            }
+            if (lidarTask != null)
+            {
+                lidarTask.GetAwaiter().GetResult();
+            }
 
-        /// <summary>
-        /// Stop scanning
-        /// </summary>
-        private void StopScan()
-        {
-            // Stop scanning
-            timerScan.Enabled = false;
-            lidar.ControlMotorDtr(false);
-            lidar.StopScan();
+            // Close port
             lidar.Close();
 
-            // Update status texts
-            labelHealth.Text = "-";
+            // Reset status texts
             labelSPC.Text = "-";
             labelPPS.Text = "-";
 
-            // Allow opening again
+            // Allow starting again
             comboPort.Enabled = true;
             comboMode.Enabled = true;
             buttonStart.Enabled = true;
             buttonStop.Enabled = false;
+        }
+
+        /// <summary>
+        /// Scan task
+        /// </summary>
+        /// <param name="mode"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task Scan(ScanMode mode, CancellationToken cancellationToken)
+        {
+            // Main loop
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                // Try to start lidar
+                if (!await StartLidar(mode))
+                {
+                    // Reset and try to start again
+                    await lidar.Reset();                    
+                    continue;
+                }
+
+                // Run lidar
+                if (!await RunLidar(cancellationToken))
+                {
+                    // Reset and try to start again
+                    await lidar.Reset();
+                    continue;
+                }
+            }
+
+            // Stop lidar
+            await StopLidar();
+        }
+
+        /// <summary>
+        /// Start lidar (at least try)
+        /// </summary>
+        /// <param name="mode">Scan mode</param>
+        /// <returns>true if succeeded, false if not</returns>
+        private async Task<bool> StartLidar(ScanMode mode)
+        {
+            // Get health
+            HealthInfo health = await lidar.GetHealth();
+            if (health == null)
+            {
+                return false;
+            }
+
+            // Good health ?
+            if (health.Status != HealthStatus.Good)
+            {
+                logger.Warn($"Health {health.Status}, error code {health.ErrorCode}.");
+                return false;
+            }
+
+            // Good health
+            logger.Info($"Health good.");
+
+            // Get configuration
+            Configuration config = await lidar.GetConfiguration();
+            if (config == null)
+            {
+                return false;
+            }
+
+            // Show configuration
+            logger.Info("Configuration:");
+            foreach (KeyValuePair<ushort, ScanModeConfiguration> modeConfig in config.Modes)
+            {
+                logger.Info($"0x{modeConfig.Key:X4} - {modeConfig.Value}"
+                    + (config.Typical == modeConfig.Key ? " (typical)" : string.Empty));
+            }
+
+            // Start motor
+            lidar.ControlMotorDtr(false);
+
+            // Start scanning
+            if (!await lidar.StartScan(mode))
+            {
+                return false;
+            }
 
             // Report
-            logger.Info("Scanning stopped.");
+            sps = 0.0f;
+            logger.Info("Scanning started.");
+
+            return true;
         }
 
         /// <summary>
-        /// Scan timer tick
+        /// Stop lidar
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void TimerScan_Tick(object sender, EventArgs e)
+        private async Task StopLidar()
         {
-            // Do scan
-            if (!lidar.GetScan(out Scan scan))
-            {
-                // Error, try to restart
-                RestartScan();
-                return;
-            }
+            // Stop scanning
+            await lidar.StopScan();
+            lidar.ControlMotorDtr(true);
 
-            // Got full scan ?
-            if (scan != null)
-            {
-                // Draw scan
-                Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
-                DrawScan(bmp, scan);
-                pictureBox.Image = bmp;
-
-                // Calculate scan per second with low pass filtering
-                float fScan = 1000.0f / Math.Max(1, scan.Duration);
-                if (sps <= float.Epsilon)
-                {
-                    sps = fScan;
-                }
-                else
-                {
-                    sps = (sps + fScan) / 2.0f;
-                }
-
-                // Show SpS
-                labelSPC.Text = sps.ToString("f2");
-                labelPPS.Text = scan.Measurements.Count.ToString();
-            }
+            // Report
+            logger.Info("Scanning stopped");
         }
 
         /// <summary>
-        /// Draw scan
+        /// Run lidar task
         /// </summary>
-        /// <param name="img"></param>
-        /// <param name="scan"></param>
+        /// <param name="cancellationToken"></param>
+        private async Task<bool> RunLidar(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                // Try to get scan
+                Scan scan = await lidar.GetScan(cancellationToken);
+                if (scan == null)
+                {
+                    // Failed, need to restart
+                    return false;
+                }
+
+                // Display it
+                BeginInvoke(new UpdateScanDelegate(UpdateScan), new object[] { scan });
+            }
+
+            // Normal exit
+            return true;
+        }
+
+        /// <summary>
+        /// Update scan
+        /// </summary>
+        /// <param name="scan">Scan object</param>
+        private void UpdateScan(Scan scan)
+        {
+            // Draw scan image
+            Bitmap bmp = new Bitmap(pictureBox.Width, pictureBox.Height);
+            DrawScan(bmp, scan);
+            pictureBox.Image = bmp;
+
+            // Show stats
+            labelSPC.Text = scan.ScanRate.ToString("f2");
+            labelPPS.Text = scan.Measurements.Count.ToString();
+        }
+
+        /// <summary>
+        /// Draw scan image
+        /// </summary>
+        /// <param name="img">Image to draw</param>
+        /// <param name="scan">Scan object</param>
         private void DrawScan(Image img, Scan scan)
         {
             Graphics gfx = Graphics.FromImage(img);
