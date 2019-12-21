@@ -18,10 +18,5 @@ namespace RPLidar
         /// Scan duration in milliseconds
         /// </summary>
         public int Duration { get; internal set; } = 0;
-
-        /// <summary>
-        /// Scan count in a second
-        /// </summary>
-        public float ScanRate { get; internal set; } = 0;
     }
 }
