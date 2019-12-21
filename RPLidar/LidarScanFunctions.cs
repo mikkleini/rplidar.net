@@ -29,17 +29,17 @@ namespace RPLidar
         /// <param name="mode">Scan mode</param>
         /// <returns>true if success, false if not</returns>
         /// <remarks>Check configuration if scan mode is supported</remarks>
-        public async Task<bool> StartScan(ScanMode mode)
+        public bool StartScan(ScanMode mode)
         {
             switch (mode)
             {
                 case ScanMode.Legacy:
-                    if (!await SendCommand(Command.Scan, "scan"))
+                    if (!SendCommand(Command.Scan, "scan"))
                     {
                         return false;
                     }
 
-                    if (!await WaitForDescriptor(LegacyScanDescriptor, "scan"))
+                    if (!WaitForDescriptor(LegacyScanDescriptor, "scan"))
                     {
                         return false;
                     }
@@ -48,12 +48,12 @@ namespace RPLidar
                     return true;
 
                 case ScanMode.ExpressLegacy:
-                    if (!await SendCommand(Command.ExpressScan, new byte[5] { 0, 0, 0, 0, 0 }, "express legacy scan"))
+                    if (!SendCommand(Command.ExpressScan, new byte[5] { 0, 0, 0, 0, 0 }, "express legacy scan"))
                     {
                         return false;
                     }
 
-                    if (!await WaitForDescriptor(ExpressLegacyScanDescriptor, "express legacy scan"))
+                    if (!WaitForDescriptor(ExpressLegacyScanDescriptor, "express legacy scan"))
                     {
                         return false;
                     }
@@ -75,14 +75,14 @@ namespace RPLidar
         /// Stop scan
         /// </summary>
         /// <returns>true if success, false if not</returns>
-        public async Task<bool> StopScan()
+        public bool StopScan()
         {
-            if (!await SendCommand(Command.Stop, "stop"))
+            if (!SendCommand(Command.Stop, "stop"))
             {
                 return false;
             }
 
-            await Task.Delay(10); // Spec requires 1 ms but leave some time for serial port to act
+            Task.Delay(10); // Spec requires 1 ms but leave some time for serial port to act
 
             // Flush inputs
             FlushInput();
@@ -109,7 +109,7 @@ namespace RPLidar
         /// <param name="cancellationToken">Cancellation token</param>
         /// <remarks>Do not use this function while using GetMeasurements or GetMeasurementsUntilNew !</remarks>
         /// <returns>Scan object in case of success or null in case of error or cancellation</returns>
-        public async Task<Scan> GetScan(CancellationToken cancellationToken)
+        public Scan GetScan(CancellationToken cancellationToken)
         {
             int bufferIndex = 0;
 
@@ -142,7 +142,7 @@ namespace RPLidar
                 }
 
                 // Try to get more measurements
-                var newMeasurements = await GetMeasurements();
+                var newMeasurements = GetMeasurements();
                 if (newMeasurements == null)
                 {
                     return null;
@@ -163,7 +163,7 @@ namespace RPLidar
         /// <param name="cancellationToken">Cancellation token</param>
         /// <remarks>Do not use this function while using GetScan or GetMeasurements!</remarks>
         /// <returns>Measurements list in case of success or null in case of failure or cancellation</returns>
-        public async Task<List<Measurement>> GetMeasurementsUntilNew(CancellationToken cancellationToken)
+        public List<Measurement> GetMeasurementsUntilNew(CancellationToken cancellationToken)
         {
             int bufferIndex = 0;
 
@@ -184,7 +184,7 @@ namespace RPLidar
                 }
 
                 // Try to get more measurements
-                var newMeasurements = await GetMeasurements();
+                var newMeasurements = GetMeasurements();
                 if (newMeasurements == null)
                 {
                     return null;
@@ -204,7 +204,7 @@ namespace RPLidar
         /// </summary>
         /// <remarks>Do not use this function while using GetScan or GetMeasurementsUntilNew!</remarks>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        public async Task<List<Measurement>> GetMeasurements()
+        public List<Measurement> GetMeasurements()
         {
             // Check port buffer utilization and give warning if it's too high
             if (!GetBytesToRead(out int bytesToRead))
@@ -226,10 +226,10 @@ namespace RPLidar
                     return null;
 
                 case ScanMode.Legacy:
-                    return await GetLegacyMeasurements();
+                    return GetLegacyMeasurements();
 
                 case ScanMode.ExpressLegacy:
-                    return await GetExpressLegacyMeasurements();
+                    return GetExpressLegacyMeasurements();
 
                 case ScanMode.ExpressExtended:
                     Logger.LogError("Express extended scan not yet supported.");
@@ -246,7 +246,7 @@ namespace RPLidar
         /// Reads at least one measurement, except in case of failure.
         /// </summary>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        private async Task<List<Measurement>> GetLegacyMeasurements()
+        private List<Measurement> GetLegacyMeasurements()
         {
             // Check how many bytes are in the buffer
             if (!GetBytesToRead(out int bytesToRead))
@@ -256,7 +256,7 @@ namespace RPLidar
 
             // Round down to fully available scan bytes but always try to read at least one scan
             bytesToRead = Math.Max(5, (bytesToRead / 5) * 5);
-            byte[] buffer = await ReadResponse(bytesToRead, "legacy scan");
+            byte[] buffer = ReadResponse(bytesToRead, "legacy scan");
             if (buffer.Length == 0)
             {
                 return null;
@@ -305,14 +305,14 @@ namespace RPLidar
         /// Reads at least one batch of 32 measurements, except in case of failure.
         /// </summary>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        private async Task<List<Measurement>> GetExpressLegacyMeasurements()
+        private List<Measurement> GetExpressLegacyMeasurements()
         {
             // Read and parse if at least two scan packets are available because
             // the next packet start angle is used to calculate absolute angle of previous scan samples
             while (true)
             {
                 // Read one packet
-                byte[] buffer = await ReadResponse(ExpressLegacyScanDescriptor.Length, "express legacy scan");
+                byte[] buffer = ReadResponse(ExpressLegacyScanDescriptor.Length, "express legacy scan");
                 if (buffer.Length == 0)
                 {
                     return null;

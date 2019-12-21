@@ -239,11 +239,11 @@ namespace RPLidar
         /// <param name="command">Command</param>
         /// <param name="commandName">Name of the command</param>
         /// <returns>true if sent, false if failed</returns>
-        private async Task<bool> SendCommand(Command command, string commandName)
+        private bool SendCommand(Command command, string commandName)
         {
             try
             {
-                await port.WriteAsync(new byte[2] { SyncByte, (byte)command }, 0, 2);
+                port.Write(new byte[2] { SyncByte, (byte)command }, 0, 2);
             }
             catch (Exception ex)
             {
@@ -261,7 +261,7 @@ namespace RPLidar
         /// <param name="payload">Payload</param>
         /// <param name="commandName">Name of the command</param>
         /// <returns>true if sent, false if failed</returns>
-        private async Task<bool> SendCommand(Command command, byte[] payload, string commandName)
+        private bool SendCommand(Command command, byte[] payload, string commandName)
         {
             byte[] data = new byte[4 + payload.Length];
             byte checksum = 0;
@@ -280,7 +280,7 @@ namespace RPLidar
 
             try
             {
-                await port.WriteAsync(data, 0, data.Length);
+                port.Write(data, 0, data.Length);
             }
             catch (Exception ex)
             {
@@ -296,7 +296,7 @@ namespace RPLidar
         /// </summary>
         /// <param name="responseName">Name of the response</param>
         /// <returns>Descriptor if succeeded, null on failure</returns>
-        private async Task<Descriptor> ReadDescriptor(string responseName)
+        private Descriptor ReadDescriptor(string responseName)
         {
             List<byte> queue = new List<byte>();
             byte[] buffer = new byte[64];
@@ -310,7 +310,7 @@ namespace RPLidar
                 missingBytes = DescriptorLength - queue.Count;
                 try
                 {
-                    bytesRead = await port.ReadAsync(buffer, 0, missingBytes);
+                    bytesRead = port.Read(buffer, 0, missingBytes);
                 }
                 catch (TimeoutException)
                 {
@@ -385,9 +385,9 @@ namespace RPLidar
         /// <param name="expectedDescriptor">Descriptor to wait for</param>
         /// <param name="responseName">Name of the response</param>
         /// <returns>true if descriptor received, false if not</returns>
-        private async Task<bool> WaitForDescriptor(Descriptor expectedDescriptor, string responseName)
+        private bool WaitForDescriptor(Descriptor expectedDescriptor, string responseName)
         {
-            Descriptor readDescriptor = await ReadDescriptor(responseName);
+            Descriptor readDescriptor = ReadDescriptor(responseName);
             if (readDescriptor == null)
             {
                 return false;
@@ -402,7 +402,7 @@ namespace RPLidar
         /// <param name="length">Number of bytes to wait for</param>
         /// <param name="responseName">Name of the response</param>
         /// <returns>Received data bytes or empty array in case of error</returns>
-        private async Task<byte[]> ReadResponse(int length, string responseName)
+        private byte[] ReadResponse(int length, string responseName)
         {
             int dataIndex = 0;
             int bytesRead;
@@ -411,10 +411,10 @@ namespace RPLidar
 
             // Get required number of data bytes
             while (dataIndex < length)
-            {
+            {               
                 try
                 {
-                    bytesRead = await port.ReadAsync(data, dataIndex, length - dataIndex);
+                    bytesRead = port.Read(data, dataIndex, length - dataIndex);
                 }
                 catch (TimeoutException)
                 {
@@ -467,23 +467,23 @@ namespace RPLidar
         /// </summary>
         /// <param name="waitTime">Number of milliseconds to wait until lidar has restarted</param>
         /// <returns>true if success, false if not</returns>
-        public async Task<bool> Reset(int waitTime = 700)
+        public bool Reset(int waitTime = 700)
         {
             // Send reset command
-            if (!await SendCommand(Command.Reset, "reset"))
+            if (!SendCommand(Command.Reset, "reset"))
             {
                 return false;
             }
 
             // Flush inputs little bit after sending reset command because of the full-duplex and asynchronous operation of the serial interface
-            await Task.Delay(10);
+            Task.Delay(10);
             FlushInput();
             ClearScanBuffer();
 
             // This is the delay to let lidar truly start up
             if (waitTime > 10)
             {
-                await Task.Delay(waitTime - 10);
+                Task.Delay(waitTime - 10);
             }
 
             // If there's something in the input buffer then read it all out and display it
@@ -494,7 +494,7 @@ namespace RPLidar
 
             if (length > 0)
             {
-                byte[] data = await ReadResponse(length, "reset response");
+                byte[] data = ReadResponse(length, "reset response");
                 if (data.Length == 0)
                 {
                     return false;
@@ -512,19 +512,19 @@ namespace RPLidar
         /// Get info
         /// </summary>
         /// <returns>Lidar info in case of success or null in case of failure</returns>
-        public async Task<LidarInfo> GetInfo()
+        public LidarInfo GetInfo()
         {
-            if (!await SendCommand(Command.GetInfo, "get info"))
+            if (!SendCommand(Command.GetInfo, "get info"))
             {
                 return null;
             }
 
-            if (!await WaitForDescriptor(InfoDescriptor, "get info"))
+            if (!WaitForDescriptor(InfoDescriptor, "get info"))
             {
                 return null;
             }
 
-            byte[] data = await ReadResponse(InfoDescriptor.Length, "get info");
+            byte[] data = ReadResponse(InfoDescriptor.Length, "get info");
             if (data.Length == 0)
             {
                 return null;
@@ -544,19 +544,19 @@ namespace RPLidar
         /// Get health
         /// </summary>
         /// <returns>Health info in case of success or null in case of failure</returns>
-        public async Task<HealthInfo> GetHealth()
+        public HealthInfo GetHealth()
         {
-            if (!await SendCommand(Command.GetHealth, "get health"))
+            if (!SendCommand(Command.GetHealth, "get health"))
             {
                 return null;
             }
 
-            if (!await WaitForDescriptor(HealthDescriptor, "get health"))
+            if (!WaitForDescriptor(HealthDescriptor, "get health"))
             {
                 return null;
             }
 
-            byte[] data = await ReadResponse(HealthDescriptor.Length, "get health");
+            byte[] data = ReadResponse(HealthDescriptor.Length, "get health");
             if (data.Length == 0)
             {
                 return null;
@@ -578,7 +578,7 @@ namespace RPLidar
         /// <param name="expectedResponseLength">Expected response payload length</param>
         /// <param name="responsePayload">Response payload bytes</param>
         /// <returns>Response payload bytes in case of success or empty array in case of failure</returns>
-        private async Task<byte[]> GetConfigurationType(ConfigType configType, byte[] requestPayload, int? expectedResponseLength)
+        private byte[] GetConfigurationType(ConfigType configType, byte[] requestPayload, int? expectedResponseLength)
         {
             string responseName = "get config";
 
@@ -588,12 +588,12 @@ namespace RPLidar
                 expectedDescriptor.Length = expectedResponseLength.Value + 4;
             }
 
-            if (!await SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray(), responseName))
+            if (!SendCommand(Command.GetConfig, BitConverter.GetBytes((uint)configType).Concat(requestPayload).ToArray(), responseName))
             {
                 return Array.Empty<byte>();
             }
 
-            Descriptor readDescriptor = await ReadDescriptor(responseName);
+            Descriptor readDescriptor = ReadDescriptor(responseName);
             if (readDescriptor == null)
             {
                 return Array.Empty<byte>();
@@ -604,7 +604,7 @@ namespace RPLidar
                 return Array.Empty<byte>();
             }
 
-            byte[] responseRaw = await ReadResponse(readDescriptor.Length, responseName);
+            byte[] responseRaw = ReadResponse(readDescriptor.Length, responseName);
             if (responseRaw.Length == 0)
             {
                 return Array.Empty<byte>();
@@ -626,12 +626,12 @@ namespace RPLidar
         /// Get lidar configuration
         /// </summary>
         /// <returns>Configuration in case of success or null in case of failure</returns>
-        public async Task<Configuration> GetConfiguration()
+        public Configuration GetConfiguration()
         {
             var configuration = new Configuration();
 
             // Get typical mode
-            byte[] response = await GetConfigurationType(ConfigType.ScanModeTypical, Array.Empty<byte>(), 2);
+            byte[] response = GetConfigurationType(ConfigType.ScanModeTypical, Array.Empty<byte>(), 2);
             if (response.Length == 0)
             {
                 return null;
@@ -640,7 +640,7 @@ namespace RPLidar
             configuration.Typical = BitConverter.ToUInt16(response, 0);
 
             // Get number of modes
-            response = await GetConfigurationType(ConfigType.ScanModeCount, Array.Empty<byte>(), 2);
+            response = GetConfigurationType(ConfigType.ScanModeCount, Array.Empty<byte>(), 2);
             if (response.Length == 0)
             {
                 return null;
@@ -657,7 +657,7 @@ namespace RPLidar
                 byte[] modeBytes = BitConverter.GetBytes(mode);
 
                 // Get mode name
-                response = await GetConfigurationType(ConfigType.ScanModeName, modeBytes, null);
+                response = GetConfigurationType(ConfigType.ScanModeName, modeBytes, null);
                 if (response.Length == 0)
                 {
                     return null;
@@ -666,7 +666,7 @@ namespace RPLidar
                 modeConfiguration.Name = Encoding.ASCII.GetString(response).TrimEnd('\0');
 
                 // Get microseconds per sample
-                response = await GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4);
+                response = GetConfigurationType(ConfigType.ScanModeUsPerSample, modeBytes, 4);
                 if (response.Length == 0)
                 {
                     return null;
@@ -675,7 +675,7 @@ namespace RPLidar
                 modeConfiguration.UsPerSample = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Get maximum distance
-                response = await GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4);
+                response = GetConfigurationType(ConfigType.ScanModeMaxDistance, modeBytes, 4);
                 if (response.Length == 0)
                 {
                     return null;
@@ -684,7 +684,7 @@ namespace RPLidar
                 modeConfiguration.MaxDistance = (float)BitConverter.ToUInt32(response, 0) / 256.0f;
 
                 // Ge answer type
-                response = await GetConfigurationType(ConfigType.ScanModeAnswerType, modeBytes, 1);
+                response = GetConfigurationType(ConfigType.ScanModeAnswerType, modeBytes, 1);
                 if (response.Length == 0)
                 {
                     return null;

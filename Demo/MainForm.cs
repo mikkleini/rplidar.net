@@ -178,31 +178,31 @@ namespace Demo
         /// <param name="mode"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task Scan(ScanMode mode, CancellationToken cancellationToken)
+        private void Scan(ScanMode mode, CancellationToken cancellationToken)
         {
             // Main loop
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Try to start lidar
-                if (!await StartLidar(mode))
+                if (!StartLidar(mode))
                 {
                     // Reset and try to start again in a while to avoid high CPU load if something breaks
-                    await lidar.Reset();
-                    await Task.Delay(1000);
+                    lidar.Reset();
+                    Thread.Sleep(1000);
                     continue;
                 }
 
                 // Run lidar
-                if (!await RunLidar(cancellationToken))
+                if (!RunLidar(cancellationToken))
                 {
                     // Reset and try to start again
-                    await lidar.Reset();
+                    lidar.Reset();
                     continue;
                 }
             }
 
             // Stop lidar
-            await StopLidar();
+            StopLidar();
         }
 
         /// <summary>
@@ -210,10 +210,10 @@ namespace Demo
         /// </summary>
         /// <param name="mode">Scan mode</param>
         /// <returns>true if succeeded, false if not</returns>
-        private async Task<bool> StartLidar(ScanMode mode)
+        private bool StartLidar(ScanMode mode)
         {
             // Get health
-            HealthInfo health = await lidar.GetHealth();
+            HealthInfo health = lidar.GetHealth();
             if (health == null)
             {
                 return false;
@@ -230,7 +230,7 @@ namespace Demo
             logger.LogInformation($"Health good.");
 
             // Get configuration
-            Configuration config = await lidar.GetConfiguration();
+            Configuration config = lidar.GetConfiguration();
             if (config == null)
             {
                 return false;
@@ -248,7 +248,7 @@ namespace Demo
             lidar.ControlMotorDtr(false);
 
             // Start scanning
-            if (!await lidar.StartScan(mode))
+            if (!lidar.StartScan(mode))
             {
                 return false;
             }
@@ -262,10 +262,10 @@ namespace Demo
         /// <summary>
         /// Stop lidar
         /// </summary>
-        private async Task StopLidar()
+        private void StopLidar()
         {
             // Stop scanning
-            await lidar.StopScan();
+            lidar.StopScan();
             lidar.ControlMotorDtr(true);
 
             // Report
@@ -276,12 +276,12 @@ namespace Demo
         /// Run lidar task
         /// </summary>
         /// <param name="cancellationToken"></param>
-        private async Task<bool> RunLidar(CancellationToken cancellationToken)
+        private bool RunLidar(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Try to get scan
-                Scan scan = await lidar.GetScan(cancellationToken);
+                Scan scan = lidar.GetScan(cancellationToken);
                 if (scan == null)
                 {
                     // It was either cancellation or error
