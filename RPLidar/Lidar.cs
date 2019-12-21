@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using NLog;
+using Microsoft.Extensions.Logging;
 
 namespace RPLidar
 {
@@ -52,7 +52,6 @@ namespace RPLidar
         private readonly Descriptor ExpressLegacyScanDescriptor = new Descriptor(84, false, 0x82);
 
         // Variables
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly SerialPort port;
 
         /// <summary>
@@ -81,6 +80,11 @@ namespace RPLidar
             Baudrate = baudRate;
             ReadBufferSize = readBufferSize;
         }
+
+        /// <summary>
+        /// Logger
+        /// </summary>
+        public ILogger Logger { get; set; }
 
         /// <summary>
         /// Port name
@@ -131,7 +135,7 @@ namespace RPLidar
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex, "Error at checking port status.");
+                    Logger.LogError(ex, "Error at checking port status.");
                     return false;
                 }
             }
@@ -170,7 +174,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Error at opening port.");
+                Logger.LogError(ex, "Error at opening port.");
                 return false;
             }
         }
@@ -192,7 +196,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Error at closing port.");
+                Logger.LogError(ex, "Error at closing port.");
                 return false;
             }
         }
@@ -209,7 +213,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Error at checking readable bytes count.");
+                Logger.LogError(ex, "Error at checking readable bytes count.");
                 count = 0;
                 return false;
             }
@@ -243,7 +247,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, $"Error at sending {commandName} command.");
+                Logger.LogError(ex, $"Error at sending {commandName} command.");
                 return false;
             }
 
@@ -280,7 +284,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, $"Error at sending command {commandName}.");
+                Logger.LogError(ex, $"Error at sending command {commandName}.");
                 return false;
             }
 
@@ -310,12 +314,12 @@ namespace RPLidar
                 }
                 catch (TimeoutException)
                 {
-                    logger.Error($"Timeout at receiving descriptor for {responseName}.");
+                    Logger.LogError($"Timeout at receiving descriptor for {responseName}.");
                     return null;
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex, $"Error at receiving descriptor for {responseName}.");
+                    Logger.LogError(ex, $"Error at receiving descriptor for {responseName}.");
                     return null;
                 }
 
@@ -339,7 +343,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    logger.Error($"Timeout at receiving descriptor for {responseName}.");
+                    Logger.LogError($"Timeout at receiving descriptor for {responseName}.");
                     return null;
                 }
             }
@@ -356,19 +360,19 @@ namespace RPLidar
         {
             if ((expectedDescriptor.Length >= 0) && (expectedDescriptor.Length != readDescriptor.Length))
             {
-                logger.Error($"Expected {responseName} descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}.");
+                Logger.LogError($"Expected {responseName} descriptor length {expectedDescriptor.Length}, got {readDescriptor.Length}.");
                 return false;
             }
 
             if (expectedDescriptor.IsSingle != readDescriptor.IsSingle)
             {
-                logger.Error($"Expected {responseName} descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}.");
+                Logger.LogError($"Expected {responseName} descriptor single to be {expectedDescriptor.IsSingle}, got {readDescriptor.IsSingle}.");
                 return false;
             }
 
             if (expectedDescriptor.DataType != readDescriptor.DataType)
             {
-                logger.Error($"Expected {responseName} descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}.");
+                Logger.LogError($"Expected {responseName} descriptor data type 0x{expectedDescriptor.DataType:X2}, got 0x{readDescriptor.DataType:X2}.");
                 return false;
             }
 
@@ -414,12 +418,12 @@ namespace RPLidar
                 }
                 catch (TimeoutException)
                 {
-                    logger.Error($"Timeout at receiving data for {responseName}.");
+                    Logger.LogError($"Timeout at receiving data for {responseName}.");
                     return Array.Empty<byte>();
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex, $"Error at receiving data for {responseName}.");
+                    Logger.LogError(ex, $"Error at receiving data for {responseName}.");
                     return Array.Empty<byte>();
                 }
 
@@ -428,58 +432,7 @@ namespace RPLidar
                 // Timeout ?
                 if ((Timestamp - startTime) > ReceiveTimeout)
                 {
-                    logger.Error($"Timeout at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-            }
-
-            return data;
-        }
-
-        /// <summary>
-        /// Read response
-        /// </summary>
-        /// <param name="length">Number of bytes to wait for</param>
-        /// <param name="responseName">Name of the response</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Received data bytes or empty array in case of error</returns>
-        private async Task<byte[]> ReadResponse(int length, string responseName, CancellationToken cancellationToken)
-        {
-            int dataIndex = 0;
-            int bytesRead;
-            long startTime = Timestamp;
-            byte[] data = new byte[length];
-
-            // Get required number of data bytes
-            while (dataIndex < length)
-            {
-                try
-                {
-                    bytesRead = await port.BaseStream.ReadAsync(data, dataIndex, length - dataIndex, cancellationToken);
-                }
-                catch (TimeoutException)
-                {
-                    logger.Error($"Timeout at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, $"Error at receiving data for {responseName}.");
-                    return Array.Empty<byte>();
-                }
-
-                // Cancelled ?
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return Array.Empty<byte>();
-                }
-
-                dataIndex += bytesRead;
-
-                // Timeout ?
-                if ((Timestamp - startTime) > ReceiveTimeout)
-                {
-                    logger.Error($"Timeout at receiving data for {responseName}.");
+                    Logger.LogError($"Timeout at receiving data for {responseName}.");
                     return Array.Empty<byte>();
                 }
             }
@@ -500,7 +453,7 @@ namespace RPLidar
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Error on flushing input buffer.");
+                Logger.LogError(ex, "Error on flushing input buffer.");
                 return false;
             }
         }
@@ -547,9 +500,9 @@ namespace RPLidar
                     return false;
                 }
 
-                // Convert to ASCII and remove line breaks
-                string msg = ASCIIEncoding.ASCII.GetString(data, 0, data.Length).Replace("\r\n", " ").Replace("\n", "");
-                logger.Info($"Reset message: {msg}");
+                // Convert to ASCII and replace control characters with space
+                string msg = new string(data.Select(b => b < 0x20 ? ' ' : (char)b).ToArray());
+                Logger.LogInformation($"Reset message: {msg}");
             }
 
             return true;
@@ -661,7 +614,7 @@ namespace RPLidar
             uint responseType = BitConverter.ToUInt32(responseRaw, 0);
             if (responseType != (byte)configType)
             {
-                logger.Error($"Expected {responseName} response type 0x{configType:X2}, got 0x{responseType:X2}.");
+                Logger.LogError($"Expected {responseName} response type 0x{configType:X2}, got 0x{responseType:X2}.");
                 return Array.Empty<byte>();
             }
 

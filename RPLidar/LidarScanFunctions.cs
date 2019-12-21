@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace RPLidar
 {
@@ -61,11 +62,11 @@ namespace RPLidar
                     return true;
 
                 case ScanMode.ExpressExtended:
-                    logger.Error("Express extended scan not yet supported.");
+                    Logger.LogError("Express extended scan not yet supported.");
                     return false;
 
                 default:
-                    logger.Fatal("Invalid scan mode, could be a bug.");
+                    Logger.LogCritical("Invalid scan mode, could be a bug.");
                     return false;
             }
         }
@@ -103,18 +104,16 @@ namespace RPLidar
         }
 
         /// <summary>
-        /// Get scan data.
-        /// Poll this function until full scan object is returned.
-        /// It can only return one 360 degrees scan at once.
+        /// Get one ~360 degree scan.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>true of operation succeeded, false if not</returns>
         /// <remarks>Do not use this function while using GetMeasurements or GetMeasurementsUntilNew !</remarks>
+        /// <returns>Scan object in case of success or null in case of error or cancellation</returns>
         public async Task<Scan> GetScan(CancellationToken cancellationToken)
         {
             int bufferIndex = 0;
 
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 // Look at buffered measurements first
                 for (; bufferIndex < bufferedScanMeasurements.Count; bufferIndex++)
@@ -143,7 +142,7 @@ namespace RPLidar
                 }
 
                 // Try to get more measurements
-                var newMeasurements = await GetMeasurements(cancellationToken);
+                var newMeasurements = await GetMeasurements();
                 if (newMeasurements == null)
                 {
                     return null;
@@ -151,22 +150,24 @@ namespace RPLidar
 
                 bufferedScanMeasurements.AddRange(newMeasurements);
             }
+
+            // Cancelled
+            return null;
         }
 
         /// <summary>
-        /// Get measurements until the new scan.
+        /// Get measurements list until the new scan.
         /// This is for quick reception of measurement without waiting for the whole 360 scan but compared to
         /// the GetMeasurements it doesn't mix up previous and new scan measurements.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>true if operation succeeded, false if something failed</returns>
-        /// <remarks>Operation can succeed even if no new measurements are added to the list</remarks>
         /// <remarks>Do not use this function while using GetScan or GetMeasurements!</remarks>
+        /// <returns>Measurements list in case of success or null in case of failure or cancellation</returns>
         public async Task<List<Measurement>> GetMeasurementsUntilNew(CancellationToken cancellationToken)
         {
             int bufferIndex = 0;
 
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 // Look at buffered measurements first
                 for (; bufferIndex < bufferedScanMeasurements.Count; bufferIndex++)
@@ -183,7 +184,7 @@ namespace RPLidar
                 }
 
                 // Try to get more measurements
-                var newMeasurements = await GetMeasurements(cancellationToken);
+                var newMeasurements = await GetMeasurements();
                 if (newMeasurements == null)
                 {
                     return null;
@@ -191,6 +192,9 @@ namespace RPLidar
 
                 bufferedScanMeasurements.AddRange(newMeasurements);
             }
+
+            // Cancelled
+            return null;
         }
 
         /// <summary>
@@ -198,10 +202,9 @@ namespace RPLidar
         /// If none is available then waits for the first one (depending on the mode it's either single measurement or single batch).
         /// This is for quick reception of measurement without waiting for the whole 360 scan.
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
         /// <remarks>Do not use this function while using GetScan or GetMeasurementsUntilNew!</remarks>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        public async Task<List<Measurement>> GetMeasurements(CancellationToken cancellationToken)
+        public async Task<List<Measurement>> GetMeasurements()
         {
             // Check port buffer utilization and give warning if it's too high
             if (!GetBytesToRead(out int bytesToRead))
@@ -212,28 +215,28 @@ namespace RPLidar
             int usage = (100 * bytesToRead) / ReadBufferSize;
             if (usage > 50)
             {
-                logger.Warn($"Receive buffer is {usage}% full, should read measurements faster.");
+                Logger.LogWarning($"Receive buffer is {usage}% full, should read measurements faster.");
             }
 
             // Do the read based on mode
             switch (activeMode)
             {
                 case null:
-                    logger.Error("No scan mode active.");
+                    Logger.LogError("No scan mode active.");
                     return null;
 
                 case ScanMode.Legacy:
-                    return await GetLegacyMeasurements(cancellationToken);
+                    return await GetLegacyMeasurements();
 
                 case ScanMode.ExpressLegacy:
-                    return await GetExpressLegacyMeasurements(cancellationToken);
+                    return await GetExpressLegacyMeasurements();
 
                 case ScanMode.ExpressExtended:
-                    logger.Error("Express extended scan not yet supported.");
+                    Logger.LogError("Express extended scan not yet supported.");
                     return null;
 
                 default:
-                    logger.Fatal($"Invalid scan mode '{activeMode}', it could be a bug");
+                    Logger.LogCritical($"Invalid scan mode '{activeMode}', it could be a bug");
                     return null;
             }
         }
@@ -242,9 +245,8 @@ namespace RPLidar
         /// Get legacy measurements.
         /// Reads at least one measurement, except in case of failure.
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        private async Task<List<Measurement>> GetLegacyMeasurements(CancellationToken cancellationToken)
+        private async Task<List<Measurement>> GetLegacyMeasurements()
         {
             // Check how many bytes are in the buffer
             if (!GetBytesToRead(out int bytesToRead))
@@ -272,14 +274,14 @@ namespace RPLidar
                 // Scan flags are inverted ?
                 if (isNewScan == isNewScan2)
                 {
-                    logger.Error("Receieved invalid scan data (start flags not inverted).");
+                    Logger.LogError("Receieved invalid scan data (start flags not inverted).");
                     return null;
                 }
 
                 // Check bit set ?
                 if ((buffer[i + 1] & 1) != 1)
                 {
-                    logger.Error("Receieved invalid scan data (check bit not set).");
+                    Logger.LogError("Receieved invalid scan data (check bit not set).");
                     return null;
                 }
 
@@ -302,9 +304,8 @@ namespace RPLidar
         /// Get express legacy measurements.
         /// Reads at least one batch of 32 measurements, except in case of failure.
         /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Measurements list in case of success or null in case of failure</returns>
-        private async Task<List<Measurement>> GetExpressLegacyMeasurements(CancellationToken cancellationToken)
+        private async Task<List<Measurement>> GetExpressLegacyMeasurements()
         {
             // Read and parse if at least two scan packets are available because
             // the next packet start angle is used to calculate absolute angle of previous scan samples
@@ -388,7 +389,7 @@ namespace RPLidar
             // Verify sync bits
             if (((buffer[0] >> 4) != 0xA) || ((buffer[1] >> 4) != 0x5))
             {
-                logger.Error("Received invalid scan packet (invalid sync).");
+                Logger.LogError("Received invalid scan packet (invalid sync).");
                 return false;
             }
 
@@ -401,7 +402,7 @@ namespace RPLidar
 
             if (checksum != ((buffer[0] & 0x0F) | ((buffer[1] & 0x0F) << 4)))
             {
-                logger.Error("Received invalid scan packet (invalid checksum).");
+                Logger.LogError("Received invalid scan packet (invalid checksum).");
                 return false;
             }
 
