@@ -411,7 +411,7 @@ namespace RPLidar
 
             // Get required number of data bytes
             while (dataIndex < length)
-            {               
+            {
                 try
                 {
                     bytesRead = port.Read(data, dataIndex, length - dataIndex);

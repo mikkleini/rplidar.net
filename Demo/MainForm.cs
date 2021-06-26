@@ -111,6 +111,9 @@ namespace Demo
             }
             lidar.PortName = (string)comboPort.SelectedItem;
 
+            // Set timeout high enough to allow slow speed scanning
+            lidar.ReceiveTimeout = 3000;
+
             // Flipped ?
             lidar.IsFlipped = comboIsFlipped.SelectedIndex == 1;
 
