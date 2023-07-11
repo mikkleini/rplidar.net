@@ -230,7 +230,7 @@ namespace RPLidar
         /// <param name="onOff">true to turn on motor, false to turn off</param>
         public void ControlMotorDtr(bool onOff)
         {
-            port.DtrEnable = !onOff;
+            port.DtrEnable = onOff;
         }
 
         /// <summary>
